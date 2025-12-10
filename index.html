@@ -302,6 +302,87 @@
       padding: 0.5rem 0;
     }
     
+    .preset-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .preset-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .preset-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+    
+    .preset-btn.active {
+      background: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      color: var(--bg-primary);
+    }
+    
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    
+    .playback-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .playback-btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-cyan);
+    }
+    
+    .playback-btn.play-btn {
+      width: 42px;
+      height: 42px;
+      background: var(--accent-emerald);
+      border-color: var(--accent-emerald);
+      color: var(--bg-primary);
+    }
+    
+    .playback-btn.play-btn:hover {
+      filter: brightness(1.1);
+    }
+    
+    .playback-btn.play-btn.playing {
+      background: #f59e0b;
+      border-color: #f59e0b;
+    }
+    
+    .playback-label {
+      flex: 1;
+      text-align: right;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
     .time-labels {
       display: flex;
       justify-content: space-between;
@@ -579,6 +660,12 @@
       <div class="panel">
         <div class="panel-title">Time Range</div>
         <div class="time-range-container">
+          <div class="preset-buttons">
+            <button class="preset-btn" data-hours="1">1h</button>
+            <button class="preset-btn" data-hours="3">3h</button>
+            <button class="preset-btn" data-hours="6">6h</button>
+            <button class="preset-btn active" data-hours="12">12h</button>
+          </div>
           <div class="time-labels">
             <div class="time-label-box">
               <div class="time-label-title">From</div>
@@ -595,7 +682,12 @@
             <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
             <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
           </div>
-          <div class="selected-count"><span id="selectedCount">140</span> images selected</div>
+          <div class="playback-controls">
+            <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
+            <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
+            <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
+            <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
+          </div>
         </div>
       </div>
       
@@ -913,7 +1005,6 @@
     const rangeSelected = document.getElementById('rangeSelected');
     const fromLabel = document.getElementById('fromLabel');
     const toLabel = document.getElementById('toLabel');
-    const selectedCount = document.getElementById('selectedCount');
     
     // Stats
     let stats = {
@@ -981,9 +1072,8 @@
       fromLabel.textContent = formatDateDisplay(fromImg?.date);
       toLabel.textContent = formatDateDisplay(toImg?.date);
       
-      // Update count
+      // Update count in stats
       const count = Math.abs(maxVal - minVal) + 1;
-      selectedCount.textContent = count;
       document.getElementById('totalImages').textContent = count;
     }
     
@@ -992,7 +1082,6 @@
       if (radarData.images.length === 0) {
         fromLabel.textContent = '--:--';
         toLabel.textContent = '--:--';
-        selectedCount.textContent = '0';
         return;
       }
       
@@ -1355,12 +1444,166 @@
     // Range slider listeners - trigger debounced processing on change
     rangeMin.addEventListener('input', () => {
       updateRangeSlider();
+      clearPresetButtons();
       debouncedProcess();
     });
     rangeMax.addEventListener('input', () => {
       updateRangeSlider();
+      clearPresetButtons();
       debouncedProcess();
     });
+    
+    // ============================================================
+    // PRESET BUTTONS (6h, 12h, 24h)
+    // ============================================================
+    const presetButtons = document.querySelectorAll('.preset-btn');
+    
+    function clearPresetButtons() {
+      presetButtons.forEach(btn => btn.classList.remove('active'));
+    }
+    
+    function setTimePreset(hours) {
+      if (radarData.images.length === 0) return;
+      
+      // Calculate how many images correspond to the hours
+      // Images are every 5 minutes, so 12 images per hour
+      const imagesPerHour = 12;
+      const totalImages = radarData.images.length;
+      const imagesNeeded = hours * imagesPerHour;
+      
+      // Set range to show last N hours (most recent images)
+      const fromIndex = Math.max(0, totalImages - imagesNeeded);
+      const toIndex = totalImages - 1;
+      
+      rangeMin.value = fromIndex;
+      rangeMax.value = toIndex;
+      updateRangeSlider();
+      debouncedProcess();
+    }
+    
+    presetButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearPresetButtons();
+        btn.classList.add('active');
+        const hours = parseInt(btn.dataset.hours);
+        setTimePreset(hours);
+      });
+    });
+    
+    // ============================================================
+    // HOUR-BY-HOUR PLAYBACK
+    // ============================================================
+    const prevHourBtn = document.getElementById('prevHourBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const nextHourBtn = document.getElementById('nextHourBtn');
+    const playbackLabel = document.getElementById('playbackLabel');
+    
+    let isPlaying = false;
+    let playbackInterval = null;
+    let currentHourOffset = 0; // Hours from the end (0 = most recent hour)
+    
+    function getHourRange() {
+      // Returns {fromIndex, toIndex} for a 1-hour window at currentHourOffset from end
+      if (radarData.images.length === 0) return { fromIndex: 0, toIndex: 0 };
+      
+      const imagesPerHour = 12;
+      const totalImages = radarData.images.length;
+      const totalHours = Math.ceil(totalImages / imagesPerHour);
+      
+      // Clamp offset
+      currentHourOffset = Math.max(0, Math.min(currentHourOffset, totalHours - 1));
+      
+      // Calculate indices for this hour
+      const toIndex = totalImages - 1 - (currentHourOffset * imagesPerHour);
+      const fromIndex = Math.max(0, toIndex - imagesPerHour + 1);
+      
+      return { fromIndex: Math.max(0, fromIndex), toIndex: Math.max(0, toIndex) };
+    }
+    
+    function showHour(offset) {
+      currentHourOffset = offset;
+      const { fromIndex, toIndex } = getHourRange();
+      
+      rangeMin.value = fromIndex;
+      rangeMax.value = toIndex;
+      updateRangeSlider();
+      clearPresetButtons();
+      
+      // Update label
+      if (currentHourOffset === 0) {
+        playbackLabel.textContent = 'Current hour';
+      } else {
+        playbackLabel.textContent = `${currentHourOffset}h ago`;
+      }
+      
+      processImages();
+    }
+    
+    function prevHour() {
+      const imagesPerHour = 12;
+      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      if (currentHourOffset < totalHours - 1) {
+        showHour(currentHourOffset + 1);
+      }
+    }
+    
+    function nextHour() {
+      if (currentHourOffset > 0) {
+        showHour(currentHourOffset - 1);
+      }
+    }
+    
+    function togglePlayback() {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        startPlayback();
+      }
+    }
+    
+    function startPlayback() {
+      isPlaying = true;
+      playPauseBtn.textContent = '⏸';
+      playPauseBtn.classList.add('playing');
+      
+      // Start from oldest hour
+      const imagesPerHour = 12;
+      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      currentHourOffset = totalHours - 1;
+      showHour(currentHourOffset);
+      
+      // Advance every 2 seconds
+      playbackInterval = setInterval(() => {
+        if (currentHourOffset > 0) {
+          nextHour();
+        } else {
+          stopPlayback();
+        }
+      }, 2000);
+    }
+    
+    function stopPlayback() {
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
+      playPauseBtn.classList.remove('playing');
+      
+      if (playbackInterval) {
+        clearInterval(playbackInterval);
+        playbackInterval = null;
+      }
+    }
+    
+    prevHourBtn.addEventListener('click', () => {
+      stopPlayback();
+      prevHour();
+    });
+    
+    nextHourBtn.addEventListener('click', () => {
+      stopPlayback();
+      nextHour();
+    });
+    
+    playPauseBtn.addEventListener('click', togglePlayback);
 
     // ============================================================
     // INITIALIZE
