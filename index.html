@@ -790,8 +790,8 @@
         return;
       }
       
-      log(`Combining ${images.length} images...`, 'info');
-      progressText.textContent = 'Combining images...';
+      log(`Accumulating rainfall from ${images.length} images...`, 'info');
+      progressText.textContent = 'Accumulating rainfall...';
       
       // Set canvas size based on first image
       const width = images[0].width;
@@ -799,19 +799,24 @@
       canvas.width = width;
       canvas.height = height;
       
-      // Create result image data (starts transparent)
-      const resultData = ctx.createImageData(width, height);
+      // Create intensity accumulation matrix (stores mm/h values)
+      const intensityMatrix = new Float32Array(width * height);
       
-      // Track which pixels have been colored (for overlap detection)
-      const coloredMap = new Uint8Array(width * height);
+      // Track how many times each pixel was colored (for overlap counting)
+      const hitCount = new Uint16Array(width * height);
       
-      // Process each image
-      for (const img of images) {
+      // Create temp canvas once for reuse
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      // Process each image - accumulate intensity values
+      for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
+        const img = images[imgIdx];
+        
         // Draw image to temp canvas to get pixel data
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = width;
-        tempCanvas.height = height;
-        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.clearRect(0, 0, width, height);
         tempCtx.drawImage(img, 0, 0);
         
         const imgData = tempCtx.getImageData(0, 0, width, height);
@@ -826,43 +831,59 @@
           const pixelIndex = i / 4;
           
           if (isPixelColored(r, g, b, a)) {
-            if (coloredMap[pixelIndex]) {
-              // Pixel already has color - combine!
-              stats.overlaps++;
-              
-              const existingColor = {
-                r: resultData.data[i],
-                g: resultData.data[i + 1],
-                b: resultData.data[i + 2],
-                a: resultData.data[i + 3]
-              };
-              
-              const newColor = { r, g, b, a };
-              const combined = combineColors(existingColor, newColor);
-              
-              resultData.data[i] = combined.r;
-              resultData.data[i + 1] = combined.g;
-              resultData.data[i + 2] = combined.b;
-              resultData.data[i + 3] = combined.a;
-            } else {
-              // First color for this pixel
-              stats.coloredPixels++;
-              coloredMap[pixelIndex] = 1;
-              
-              resultData.data[i] = r;
-              resultData.data[i + 1] = g;
-              resultData.data[i + 2] = b;
-              resultData.data[i + 3] = a;
-            }
+            // Convert RGB to rainfall intensity and accumulate
+            const intensity = rgbToIntensity(r, g, b);
+            intensityMatrix[pixelIndex] += intensity;
+            hitCount[pixelIndex]++;
           }
         }
+        
+        // Update progress
+        const progress = ((imgIdx + 1) / images.length) * 100;
+        progressFill.style.width = `${progress}%`;
+        progressText.textContent = `Processing image ${imgIdx + 1}/${images.length}`;
+      }
+      
+      log('Converting accumulated values to colors...', 'info');
+      progressText.textContent = 'Rendering final image...';
+      
+      // Create result image from accumulated intensity values
+      const resultData = ctx.createImageData(width, height);
+      
+      for (let pixelIndex = 0; pixelIndex < intensityMatrix.length; pixelIndex++) {
+        const i = pixelIndex * 4;
+        const intensity = intensityMatrix[pixelIndex];
+        const hits = hitCount[pixelIndex];
+        
+        if (intensity > 0) {
+          // Convert accumulated intensity back to RGB
+          const color = intensityToRgb(intensity);
+          
+          resultData.data[i] = color.r;
+          resultData.data[i + 1] = color.g;
+          resultData.data[i + 2] = color.b;
+          resultData.data[i + 3] = 255; // Fully opaque
+          
+          stats.coloredPixels++;
+          if (hits > 1) {
+            stats.overlaps += hits - 1;
+          }
+        }
+        // Else: leave transparent (0, 0, 0, 0)
       }
       
       // Draw result
       ctx.putImageData(resultData, 0, 0);
       
+      // Find max accumulated rainfall
+      let maxIntensity = 0;
+      for (let i = 0; i < intensityMatrix.length; i++) {
+        if (intensityMatrix[i] > maxIntensity) maxIntensity = intensityMatrix[i];
+      }
+      
       updateStats();
-      log(`Done! ${stats.coloredPixels} colored pixels, ${stats.overlaps} overlaps`, 'success');
+      log(`Done! Max accumulated rainfall: ${maxIntensity.toFixed(1)} mm`, 'success');
+      log(`${stats.coloredPixels.toLocaleString()} pixels with rain, ${stats.overlaps.toLocaleString()} overlaps`, 'success');
       
       progressText.textContent = 'Complete!';
       processBtn.disabled = false;
