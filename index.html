@@ -400,10 +400,10 @@
         </div>
         
         <div class="panel">
-          <div class="panel-title">Color Combination</div>
+          <div class="panel-title">Rainfall Accumulation</div>
           <div class="color-map-info">
-            <p>Pixels are combined using a custom blending function. Currently using additive overlay.</p>
-            <p style="margin-top: 0.5rem;">Edit the <code>combineColors()</code> function in the code to customize blending rules.</p>
+            <p>Colors are mapped to rainfall intensity (mm/h), values are <strong>added</strong> when pixels overlap, then mapped back to colors.</p>
+            <p style="margin-top: 0.5rem;">Scale: <code>0.1</code> → <code>200</code> mm/h</p>
           </div>
         </div>
         
@@ -419,29 +419,152 @@
     // Radar image data (from JSON)
     const radarData = {
       "path": "pics/radar-clouds-ims/",
-      "update_time": "10:40 07/11/2025",
+      "update_time": "10:10 10/11/2025",
       "images": [
-        {"name": "1765054502.png", "time": "יום שבת 22:55 06/12/2025"},
-        {"name": "1765054803.png", "time": "יום שבת 23:00 06/12/2025"},
-        {"name": "1765055103.png", "time": "יום שבת 23:05 06/12/2025"},
-        {"name": "1765055402.png", "time": "יום שבת 23:10 06/12/2025"},
-        {"name": "1765055703.png", "time": "יום שבת 23:15 06/12/2025"},
-        {"name": "1765056003.png", "time": "יום שבת 23:20 06/12/2025"},
-        {"name": "1765056302.png", "time": "יום שבת 23:25 06/12/2025"},
-        {"name": "1765056603.png", "time": "יום שבת 23:30 06/12/2025"},
-        {"name": "1765056903.png", "time": "יום שבת 23:35 06/12/2025"},
-        {"name": "1765057203.png", "time": "יום שבת 23:40 06/12/2025"},
-        {"name": "1765057502.png", "time": "יום שבת 23:45 06/12/2025"},
-        {"name": "1765057803.png", "time": "יום שבת 23:50 06/12/2025"},
-        {"name": "1765058103.png", "time": "יום שבת 23:55 06/12/2025"},
-        {"name": "1765058403.png", "time": "יום ראשון 00:00 07/12/2025"},
-        {"name": "1765058702.png", "time": "יום ראשון 00:05 07/12/2025"},
-        {"name": "1765059003.png", "time": "יום ראשון 00:10 07/12/2025"},
-        {"name": "1765059302.png", "time": "יום ראשון 00:15 07/12/2025"},
-        {"name": "1765059603.png", "time": "יום ראשון 00:20 07/12/2025"},
-        {"name": "1765059902.png", "time": "יום ראשון 00:25 07/12/2025"},
-        {"name": "1765060203.png", "time": "יום ראשון 00:30 07/12/2025"}
-        // Add more images as needed - using first 20 for demo
+        {"name": "1765312203.png", "time": "יום שלישי 22:30 09/12/2025"},
+        {"name": "1765312502.png", "time": "יום שלישי 22:35 09/12/2025"},
+        {"name": "1765312802.png", "time": "יום שלישי 22:40 09/12/2025"},
+        {"name": "1765313103.png", "time": "יום שלישי 22:45 09/12/2025"},
+        {"name": "1765313403.png", "time": "יום שלישי 22:50 09/12/2025"},
+        {"name": "1765313703.png", "time": "יום שלישי 22:55 09/12/2025"},
+        {"name": "1765314003.png", "time": "יום שלישי 23:00 09/12/2025"},
+        {"name": "1765314302.png", "time": "יום שלישי 23:05 09/12/2025"},
+        {"name": "1765314603.png", "time": "יום שלישי 23:10 09/12/2025"},
+        {"name": "1765314903.png", "time": "יום שלישי 23:15 09/12/2025"},
+        {"name": "1765315202.png", "time": "יום שלישי 23:20 09/12/2025"},
+        {"name": "1765315502.png", "time": "יום שלישי 23:25 09/12/2025"},
+        {"name": "1765315803.png", "time": "יום שלישי 23:30 09/12/2025"},
+        {"name": "1765316103.png", "time": "יום שלישי 23:35 09/12/2025"},
+        {"name": "1765316403.png", "time": "יום שלישי 23:40 09/12/2025"},
+        {"name": "1765316703.png", "time": "יום שלישי 23:45 09/12/2025"},
+        {"name": "1765317002.png", "time": "יום שלישי 23:50 09/12/2025"},
+        {"name": "1765317302.png", "time": "יום שלישי 23:55 09/12/2025"},
+        {"name": "1765317602.png", "time": "יום רביעי 00:00 10/12/2025"},
+        {"name": "1765317903.png", "time": "יום רביעי 00:05 10/12/2025"},
+        {"name": "1765318203.png", "time": "יום רביעי 00:10 10/12/2025"},
+        {"name": "1765318503.png", "time": "יום רביעי 00:15 10/12/2025"},
+        {"name": "1765318803.png", "time": "יום רביעי 00:20 10/12/2025"},
+        {"name": "1765319103.png", "time": "יום רביעי 00:25 10/12/2025"},
+        {"name": "1765319403.png", "time": "יום רביעי 00:30 10/12/2025"},
+        {"name": "1765319703.png", "time": "יום רביעי 00:35 10/12/2025"},
+        {"name": "1765320003.png", "time": "יום רביעי 00:40 10/12/2025"},
+        {"name": "1765320303.png", "time": "יום רביעי 00:45 10/12/2025"},
+        {"name": "1765320603.png", "time": "יום רביעי 00:50 10/12/2025"},
+        {"name": "1765320903.png", "time": "יום רביעי 00:55 10/12/2025"},
+        {"name": "1765321203.png", "time": "יום רביעי 01:00 10/12/2025"},
+        {"name": "1765321502.png", "time": "יום רביעי 01:05 10/12/2025"},
+        {"name": "1765321803.png", "time": "יום רביעי 01:10 10/12/2025"},
+        {"name": "1765322103.png", "time": "יום רביעי 01:15 10/12/2025"},
+        {"name": "1765322402.png", "time": "יום רביעי 01:20 10/12/2025"},
+        {"name": "1765322702.png", "time": "יום רביעי 01:25 10/12/2025"},
+        {"name": "1765323003.png", "time": "יום רביעי 01:30 10/12/2025"},
+        {"name": "1765323303.png", "time": "יום רביעי 01:35 10/12/2025"},
+        {"name": "1765323604.png", "time": "יום רביעי 01:40 10/12/2025"},
+        {"name": "1765323903.png", "time": "יום רביעי 01:45 10/12/2025"},
+        {"name": "1765324203.png", "time": "יום רביעי 01:50 10/12/2025"},
+        {"name": "1765324502.png", "time": "יום רביעי 01:55 10/12/2025"},
+        {"name": "1765324803.png", "time": "יום רביעי 02:00 10/12/2025"},
+        {"name": "1765325103.png", "time": "יום רביעי 02:05 10/12/2025"},
+        {"name": "1765325403.png", "time": "יום רביעי 02:10 10/12/2025"},
+        {"name": "1765325703.png", "time": "יום רביעי 02:15 10/12/2025"},
+        {"name": "1765326002.png", "time": "יום רביעי 02:20 10/12/2025"},
+        {"name": "1765326302.png", "time": "יום רביעי 02:25 10/12/2025"},
+        {"name": "1765326602.png", "time": "יום רביעי 02:30 10/12/2025"},
+        {"name": "1765326902.png", "time": "יום רביעי 02:35 10/12/2025"},
+        {"name": "1765327202.png", "time": "יום רביעי 02:40 10/12/2025"},
+        {"name": "1765327503.png", "time": "יום רביעי 02:45 10/12/2025"},
+        {"name": "1765327802.png", "time": "יום רביעי 02:50 10/12/2025"},
+        {"name": "1765328103.png", "time": "יום רביעי 02:55 10/12/2025"},
+        {"name": "1765328403.png", "time": "יום רביעי 03:00 10/12/2025"},
+        {"name": "1765328703.png", "time": "יום רביעי 03:05 10/12/2025"},
+        {"name": "1765329003.png", "time": "יום רביעי 03:10 10/12/2025"},
+        {"name": "1765329302.png", "time": "יום רביעי 03:15 10/12/2025"},
+        {"name": "1765329603.png", "time": "יום רביעי 03:20 10/12/2025"},
+        {"name": "1765329902.png", "time": "יום רביעי 03:25 10/12/2025"},
+        {"name": "1765330202.png", "time": "יום רביעי 03:30 10/12/2025"},
+        {"name": "1765330503.png", "time": "יום רביעי 03:35 10/12/2025"},
+        {"name": "1765330802.png", "time": "יום רביעי 03:40 10/12/2025"},
+        {"name": "1765331103.png", "time": "יום רביעי 03:45 10/12/2025"},
+        {"name": "1765331403.png", "time": "יום רביעי 03:50 10/12/2025"},
+        {"name": "1765331702.png", "time": "יום רביעי 03:55 10/12/2025"},
+        {"name": "1765332002.png", "time": "יום רביעי 04:00 10/12/2025"},
+        {"name": "1765332302.png", "time": "יום רביעי 04:05 10/12/2025"},
+        {"name": "1765332602.png", "time": "יום רביעי 04:10 10/12/2025"},
+        {"name": "1765332903.png", "time": "יום רביעי 04:15 10/12/2025"},
+        {"name": "1765333203.png", "time": "יום רביעי 04:20 10/12/2025"},
+        {"name": "1765333502.png", "time": "יום רביעי 04:25 10/12/2025"},
+        {"name": "1765333802.png", "time": "יום רביעי 04:30 10/12/2025"},
+        {"name": "1765334102.png", "time": "יום רביעי 04:35 10/12/2025"},
+        {"name": "1765334403.png", "time": "יום רביעי 04:40 10/12/2025"},
+        {"name": "1765334703.png", "time": "יום רביעי 04:45 10/12/2025"},
+        {"name": "1765335002.png", "time": "יום רביעי 04:50 10/12/2025"},
+        {"name": "1765335303.png", "time": "יום רביעי 04:55 10/12/2025"},
+        {"name": "1765335602.png", "time": "יום רביעי 05:00 10/12/2025"},
+        {"name": "1765335903.png", "time": "יום רביעי 05:05 10/12/2025"},
+        {"name": "1765336202.png", "time": "יום רביעי 05:10 10/12/2025"},
+        {"name": "1765336503.png", "time": "יום רביעי 05:15 10/12/2025"},
+        {"name": "1765336803.png", "time": "יום רביעי 05:20 10/12/2025"},
+        {"name": "1765337103.png", "time": "יום רביעי 05:25 10/12/2025"},
+        {"name": "1765337403.png", "time": "יום רביעי 05:30 10/12/2025"},
+        {"name": "1765337702.png", "time": "יום רביעי 05:35 10/12/2025"},
+        {"name": "1765338003.png", "time": "יום רביעי 05:40 10/12/2025"},
+        {"name": "1765338302.png", "time": "יום רביעי 05:45 10/12/2025"},
+        {"name": "1765338602.png", "time": "יום רביעי 05:50 10/12/2025"},
+        {"name": "1765338903.png", "time": "יום רביעי 05:55 10/12/2025"},
+        {"name": "1765339203.png", "time": "יום רביעי 06:00 10/12/2025"},
+        {"name": "1765339503.png", "time": "יום רביעי 06:05 10/12/2025"},
+        {"name": "1765339803.png", "time": "יום רביעי 06:10 10/12/2025"},
+        {"name": "1765340103.png", "time": "יום רביעי 06:15 10/12/2025"},
+        {"name": "1765340402.png", "time": "יום רביעי 06:20 10/12/2025"},
+        {"name": "1765340702.png", "time": "יום רביעי 06:25 10/12/2025"},
+        {"name": "1765341002.png", "time": "יום רביעי 06:30 10/12/2025"},
+        {"name": "1765341303.png", "time": "יום רביעי 06:35 10/12/2025"},
+        {"name": "1765341603.png", "time": "יום רביעי 06:40 10/12/2025"},
+        {"name": "1765341902.png", "time": "יום רביעי 06:45 10/12/2025"},
+        {"name": "1765342203.png", "time": "יום רביעי 06:50 10/12/2025"},
+        {"name": "1765342503.png", "time": "יום רביעי 06:55 10/12/2025"},
+        {"name": "1765342803.png", "time": "יום רביעי 07:00 10/12/2025"},
+        {"name": "1765343103.png", "time": "יום רביעי 07:05 10/12/2025"},
+        {"name": "1765343402.png", "time": "יום רביעי 07:10 10/12/2025"},
+        {"name": "1765343703.png", "time": "יום רביעי 07:15 10/12/2025"},
+        {"name": "1765344002.png", "time": "יום רביעי 07:20 10/12/2025"},
+        {"name": "1765344302.png", "time": "יום רביעי 07:25 10/12/2025"},
+        {"name": "1765344603.png", "time": "יום רביעי 07:30 10/12/2025"},
+        {"name": "1765344902.png", "time": "יום רביעי 07:35 10/12/2025"},
+        {"name": "1765345203.png", "time": "יום רביעי 07:40 10/12/2025"},
+        {"name": "1765345503.png", "time": "יום רביעי 07:45 10/12/2025"},
+        {"name": "1765345802.png", "time": "יום רביעי 07:50 10/12/2025"},
+        {"name": "1765346103.png", "time": "יום רביעי 07:55 10/12/2025"},
+        {"name": "1765346403.png", "time": "יום רביעי 08:00 10/12/2025"},
+        {"name": "1765346703.png", "time": "יום רביעי 08:05 10/12/2025"},
+        {"name": "1765347002.png", "time": "יום רביעי 08:10 10/12/2025"},
+        {"name": "1765347302.png", "time": "יום רביעי 08:15 10/12/2025"},
+        {"name": "1765347603.png", "time": "יום רביעי 08:20 10/12/2025"},
+        {"name": "1765347903.png", "time": "יום רביעי 08:25 10/12/2025"},
+        {"name": "1765348202.png", "time": "יום רביעי 08:30 10/12/2025"},
+        {"name": "1765348503.png", "time": "יום רביעי 08:35 10/12/2025"},
+        {"name": "1765348802.png", "time": "יום רביעי 08:40 10/12/2025"},
+        {"name": "1765349103.png", "time": "יום רביעי 08:45 10/12/2025"},
+        {"name": "1765349403.png", "time": "יום רביעי 08:50 10/12/2025"},
+        {"name": "1765349702.png", "time": "יום רביעי 08:55 10/12/2025"},
+        {"name": "1765350003.png", "time": "יום רביעי 09:00 10/12/2025"},
+        {"name": "1765350302.png", "time": "יום רביעי 09:05 10/12/2025"},
+        {"name": "1765350602.png", "time": "יום רביעי 09:10 10/12/2025"},
+        {"name": "1765350903.png", "time": "יום רביעי 09:15 10/12/2025"},
+        {"name": "1765351202.png", "time": "יום רביעי 09:20 10/12/2025"},
+        {"name": "1765351503.png", "time": "יום רביעי 09:25 10/12/2025"},
+        {"name": "1765351803.png", "time": "יום רביעי 09:30 10/12/2025"},
+        {"name": "1765352103.png", "time": "יום רביעי 09:35 10/12/2025"},
+        {"name": "1765352402.png", "time": "יום רביעי 09:40 10/12/2025"},
+        {"name": "1765352703.png", "time": "יום רביעי 09:45 10/12/2025"},
+        {"name": "1765353003.png", "time": "יום רביעי 09:50 10/12/2025"},
+        {"name": "1765353303.png", "time": "יום רביעי 09:55 10/12/2025"},
+        {"name": "1765353602.png", "time": "יום רביעי 10:00 10/12/2025"},
+        {"name": "1765353903.png", "time": "יום רביעי 10:05 10/12/2025"},
+        {"name": "1765354203.png", "time": "יום רביעי 10:10 10/12/2025"},
+        {"name": "1765354502.png", "time": "יום רביעי 10:15 10/12/2025"},
+        {"name": "1765354802.png", "time": "יום רביעי 10:20 10/12/2025"},
+        {"name": "1765355103.png", "time": "יום רביעי 10:25 10/12/2025"}
       ]
     };
 
@@ -466,60 +589,116 @@
     };
 
     // ============================================================
-    // COLOR COMBINATION FUNCTION - CUSTOMIZE THIS!
+    // RAINFALL INTENSITY COLOR TABLE (mm/hour)
     // ============================================================
-    // This function is called when two colored pixels overlap.
-    // Parameters:
-    //   color1: {r, g, b, a} - First pixel color (existing)
-    //   color2: {r, g, b, a} - Second pixel color (new)
-    // Returns:
-    //   {r, g, b, a} - Combined color
-    // 
-    // Example rules you can implement:
-    //   blue + blue = purple
-    //   green + blue = cyan
-    //   etc.
+    // Maps colors to rainfall intensity values and vice versa
+    // When pixels overlap, we ADD their intensity values
     // ============================================================
-    function combineColors(color1, color2) {
-      // Default: Additive blending with max intensity tracking
-      // This creates a "heat map" effect where more overlaps = more intense
+    const radarColors = [
+      { intensity: 200,  r: 108, g: 27,  b: 66  },  // Dark maroon
+      { intensity: 100,  r: 155, g: 31,  b: 95  },  // Magenta
+      { intensity: 50,   r: 212, g: 31,  b: 50  },  // Red
+      { intensity: 40,   r: 232, g: 68,  b: 32  },  // Orange-red
+      { intensity: 30,   r: 240, g: 120, b: 24  },  // Orange
+      { intensity: 24,   r: 248, g: 168, b: 24  },  // Yellow-orange
+      { intensity: 18,   r: 248, g: 224, b: 24  },  // Yellow
+      { intensity: 13,   r: 192, g: 224, b: 24  },  // Yellow-green
+      { intensity: 9,    r: 88,  g: 192, b: 24  },  // Green
+      { intensity: 6,    r: 24,  g: 184, b: 136 },  // Teal
+      { intensity: 4,    r: 24,  g: 168, b: 200 },  // Cyan
+      { intensity: 2,    r: 24,  g: 136, b: 216 },  // Light blue
+      { intensity: 1.2,  r: 56,  g: 104, b: 200 },  // Blue
+      { intensity: 0.6,  r: 120, g: 136, b: 200 },  // Lavender
+      { intensity: 0.3,  r: 168, g: 168, b: 208 },  // Light lavender
+      { intensity: 0.1,  r: 208, g: 208, b: 232 },  // Very light
+    ];
+
+    // Calculate color distance (Euclidean in RGB space)
+    function colorDistance(r1, g1, b1, r2, g2, b2) {
+      return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+    }
+
+    // Map RGB color to rainfall intensity (mm/h)
+    function rgbToIntensity(r, g, b) {
+      let bestMatch = radarColors[radarColors.length - 1];
+      let bestDistance = Infinity;
       
-      // You can identify colors and apply custom rules:
-      const isBlue1 = color1.b > color1.r && color1.b > color1.g;
-      const isBlue2 = color2.b > color2.r && color2.b > color2.g;
-      const isGreen1 = color1.g > color1.r && color1.g > color1.b;
-      const isGreen2 = color2.g > color2.r && color2.g > color2.b;
-      const isRed1 = color1.r > color1.g && color1.r > color1.b;
-      const isRed2 = color2.r > color2.g && color2.r > color2.b;
-      
-      // Example: blue + blue = purple (shift toward magenta)
-      if (isBlue1 && isBlue2) {
-        return {
-          r: Math.min(255, (color1.r + color2.r) / 2 + 80), // Add red for purple
-          g: Math.min(255, (color1.g + color2.g) / 2),
-          b: Math.min(255, (color1.b + color2.b) / 2),
-          a: Math.max(color1.a, color2.a)
-        };
+      for (const color of radarColors) {
+        const dist = colorDistance(r, g, b, color.r, color.g, color.b);
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          bestMatch = color;
+        }
       }
       
-      // Default: screen blend mode (brightens overlaps)
+      return bestMatch.intensity;
+    }
+
+    // Map rainfall intensity (mm/h) to RGB color
+    function intensityToRgb(intensity) {
+      // Clamp to max intensity
+      if (intensity >= radarColors[0].intensity) {
+        return { r: radarColors[0].r, g: radarColors[0].g, b: radarColors[0].b };
+      }
+      
+      // Find the appropriate color band
+      for (let i = 0; i < radarColors.length - 1; i++) {
+        if (intensity >= radarColors[i + 1].intensity) {
+          // Interpolate between this color and the next higher one
+          const lower = radarColors[i + 1];
+          const upper = radarColors[i];
+          const range = upper.intensity - lower.intensity;
+          const t = (intensity - lower.intensity) / range;
+          
+          return {
+            r: Math.round(lower.r + (upper.r - lower.r) * t),
+            g: Math.round(lower.g + (upper.g - lower.g) * t),
+            b: Math.round(lower.b + (upper.b - lower.b) * t)
+          };
+        }
+      }
+      
+      // Below minimum - return lightest color
+      return { 
+        r: radarColors[radarColors.length - 1].r, 
+        g: radarColors[radarColors.length - 1].g, 
+        b: radarColors[radarColors.length - 1].b 
+      };
+    }
+
+    // Combine colors by adding their rainfall intensity values
+    function combineColors(color1, color2) {
+      // Map both colors to intensity values
+      const intensity1 = rgbToIntensity(color1.r, color1.g, color1.b);
+      const intensity2 = rgbToIntensity(color2.r, color2.g, color2.b);
+      
+      // Add intensities (cumulative rainfall)
+      const combinedIntensity = intensity1 + intensity2;
+      
+      // Map back to color
+      const newColor = intensityToRgb(combinedIntensity);
+      
       return {
-        r: Math.min(255, 255 - ((255 - color1.r) * (255 - color2.r)) / 255),
-        g: Math.min(255, 255 - ((255 - color1.g) * (255 - color2.g)) / 255),
-        b: Math.min(255, 255 - ((255 - color1.b) * (255 - color2.b)) / 255),
+        r: newColor.r,
+        g: newColor.g,
+        b: newColor.b,
         a: Math.max(color1.a, color2.a)
       };
     }
 
     // Check if a pixel is considered "clear" (transparent or nearly transparent)
     function isPixelClear(r, g, b, a) {
-      // Consider pixel clear if alpha is low or it's very close to transparent
-      return a < 10;
+      // Consider pixel clear if:
+      // 1. Alpha is low (transparent)
+      // 2. Pixel is white or near-white (drop white pixels)
+      if (a < 10) return true;
+      if (r > 240 && g > 240 && b > 240) return true; // White pixel
+      return false;
     }
 
     // Check if a pixel is considered "colored" (not clear)
     function isPixelColored(r, g, b, a) {
-      return a >= 10;
+      return !isPixelClear(r, g, b, a);
     }
 
     // Logging utility
