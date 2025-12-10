@@ -538,8 +538,8 @@
       
       <div class="panel">
         <div class="panel-title">Controls</div>
-        <button id="processBtn" class="btn btn-primary">
-          <span id="btnText">Process & Overlay</span>
+        <button id="refreshBtn" class="btn btn-primary">
+          <span id="refreshBtnText">🔄 Refresh Data</span>
         </button>
         <div class="progress-container" id="progressContainer" style="display: none;">
           <div class="progress-bar">
@@ -708,8 +708,8 @@
     // ============================================================
     const canvas = document.getElementById('processingCanvas');
     const ctx = canvas.getContext('2d');
-    const processBtn = document.getElementById('processBtn');
-    const btnText = document.getElementById('btnText');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const refreshBtnText = document.getElementById('refreshBtnText');
     const progressContainer = document.getElementById('progressContainer');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
@@ -933,9 +933,13 @@
     // ============================================================
     // MAIN PROCESSING
     // ============================================================
+    let isProcessing = false;
+    
     async function processImages() {
-      processBtn.disabled = true;
-      btnText.innerHTML = '<span class="spinner"></span> Processing...';
+      if (isProcessing) return; // Prevent concurrent processing
+      if (radarData.images.length === 0) return; // No data yet
+      
+      isProcessing = true;
       progressContainer.style.display = 'block';
       
       // Get filtered images based on date range
@@ -943,9 +947,8 @@
       
       if (filteredImages.length === 0) {
         log('No images in selected time range.', 'error');
-        processBtn.disabled = false;
-        btnText.textContent = 'Process & Overlay';
         progressContainer.style.display = 'none';
+        isProcessing = false;
         return;
       }
       
@@ -985,8 +988,7 @@
       
       if (images.length === 0) {
         log('No images loaded. Check CORS proxy.', 'error');
-        processBtn.disabled = false;
-        btnText.textContent = 'Process & Overlay';
+        isProcessing = false;
         return;
       }
       
@@ -1084,21 +1086,49 @@
       }).addTo(map);
       
       // Fit map to radar bounds
-      map.fitBounds(RADAR_BOUNDS);
+      // map.fitBounds(RADAR_BOUNDS);
       
       updateStats();
       log(`Done! Max rainfall: ${stats.maxRainfall.toFixed(1)} mm`, 'success');
       log(`${stats.overlaps.toLocaleString()} pixel overlaps detected`, 'success');
       
       progressText.textContent = 'Complete!';
-      processBtn.disabled = false;
-      btnText.textContent = 'Process & Overlay';
+      isProcessing = false;
+    }
+
+    // ============================================================
+    // DEBOUNCED PROCESSING (for slider changes)
+    // ============================================================
+    let processTimeout = null;
+    
+    function debouncedProcess() {
+      if (processTimeout) clearTimeout(processTimeout);
+      processTimeout = setTimeout(() => {
+        processImages();
+      }, 500); // Wait 500ms after last slider change
+    }
+
+    // ============================================================
+    // REFRESH DATA FROM API
+    // ============================================================
+    async function refreshData() {
+      refreshBtn.disabled = true;
+      refreshBtnText.innerHTML = '<span class="spinner"></span> Refreshing...';
+      
+      const success = await loadRadarData();
+      
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh Data';
+      
+      if (success) {
+        processImages(); // Auto-process after refresh
+      }
     }
 
     // ============================================================
     // EVENT LISTENERS
     // ============================================================
-    processBtn.addEventListener('click', processImages);
+    refreshBtn.addEventListener('click', refreshData);
     
     opacitySlider.addEventListener('input', (e) => {
       const value = e.target.value;
@@ -1109,25 +1139,32 @@
       }
     });
     
-    // Range slider listeners
-    rangeMin.addEventListener('input', updateRangeSlider);
-    rangeMax.addEventListener('input', updateRangeSlider);
+    // Range slider listeners - trigger debounced processing on change
+    rangeMin.addEventListener('input', () => {
+      updateRangeSlider();
+      debouncedProcess();
+    });
+    rangeMax.addEventListener('input', () => {
+      updateRangeSlider();
+      debouncedProcess();
+    });
 
     // ============================================================
     // INITIALIZE
     // ============================================================
     buildLegend();
     
-    // Disable process button until data is loaded
-    processBtn.disabled = true;
-    btnText.textContent = 'Loading...';
+    // Disable refresh button until initial data is loaded
+    refreshBtn.disabled = true;
+    refreshBtnText.innerHTML = '<span class="spinner"></span> Loading...';
     
-    // Load radar data from API, then initialize
+    // Load radar data from API, then auto-process
     loadRadarData().then(success => {
-      processBtn.disabled = false;
-      btnText.textContent = 'Process & Overlay';
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh Data';
       if (success) {
-        log('Ready. Select time range and click "Process & Overlay".', 'info');
+        log('Auto-processing images...', 'info');
+        processImages(); // Auto-process on load
       }
     });
   </script>
