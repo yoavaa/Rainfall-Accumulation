@@ -655,8 +655,10 @@
       try {
         log('Loading radar image list from API...', 'info');
         
-        // Use CORS proxy to fetch the API
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(RADAR_API_URL)}`;
+        // Use CORS proxy to fetch the API (with 5-min interval cache-busting)
+        const fiveMinMs = 5 * 60 * 1000;
+        const cacheBuster = `&_t=${Math.floor(Date.now() / fiveMinMs)}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(RADAR_API_URL + cacheBuster)}`;
         const response = await fetch(proxyUrl);
         
         if (!response.ok) {
