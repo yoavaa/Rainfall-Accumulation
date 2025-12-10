@@ -630,22 +630,22 @@
     // RAINFALL INTENSITY COLOR TABLE (mm/hour)
     // ============================================================
     const radarColors = [
-      { intensity: 200,  r: 108, g: 27,  b: 66  },  // Dark maroon
-      { intensity: 100,  r: 155, g: 31,  b: 95  },  // Magenta
-      { intensity: 50,   r: 212, g: 31,  b: 50  },  // Red
-      { intensity: 40,   r: 232, g: 68,  b: 32  },  // Orange-red
-      { intensity: 30,   r: 240, g: 120, b: 24  },  // Orange
-      { intensity: 24,   r: 248, g: 168, b: 24  },  // Yellow-orange
-      { intensity: 18,   r: 248, g: 224, b: 24  },  // Yellow
-      { intensity: 13,   r: 192, g: 224, b: 24  },  // Yellow-green
-      { intensity: 9,    r: 88,  g: 192, b: 24  },  // Green
-      { intensity: 6,    r: 24,  g: 184, b: 136 },  // Teal
-      { intensity: 4,    r: 24,  g: 168, b: 200 },  // Cyan
-      { intensity: 2,    r: 24,  g: 136, b: 216 },  // Light blue
-      { intensity: 1.2,  r: 56,  g: 104, b: 200 },  // Blue
-      { intensity: 0.6,  r: 120, g: 136, b: 200 },  // Lavender
-      { intensity: 0.3,  r: 168, g: 168, b: 208 },  // Light lavender
-      { intensity: 0.1,  r: 208, g: 208, b: 232 },  // Very light
+      { intensity: 200,  r: 108, g: 27,  b: 66, accumulated: 50  },  // Dark maroon
+      { intensity: 100,  r: 155, g: 31,  b: 95, accumulated: 25  },  // Magenta
+      { intensity: 50,   r: 212, g: 31,  b: 50, accumulated: 12  },  // Red
+      { intensity: 40,   r: 232, g: 68,  b: 32, accumulated: 10  },  // Orange-red
+      { intensity: 30,   r: 240, g: 120, b: 24, accumulated: 7.5  },  // Orange
+      { intensity: 24,   r: 248, g: 168, b: 24, accumulated: 6  },  // Yellow-orange
+      { intensity: 18,   r: 248, g: 224, b: 24, accumulated: 4.5  },  // Yellow
+      { intensity: 13,   r: 192, g: 224, b: 24, accumulated: 3  },  // Yellow-green
+      { intensity: 9,    r: 88,  g: 192, b: 24, accumulated: 2.2  },  // Green
+      { intensity: 6,    r: 24,  g: 184, b: 136, accumulated: 1.5 },  // Teal
+      { intensity: 4,    r: 24,  g: 168, b: 200, accumulated: 1 },  // Cyan
+      { intensity: 2,    r: 24,  g: 136, b: 216, accumulated: 0.5 },  // Light blue
+      { intensity: 1.2,  r: 56,  g: 104, b: 200, accumulated: 0.3 },  // Blue
+      { intensity: 0.6,  r: 120, g: 136, b: 200, accumulated: 0.15 },  // Lavender
+      { intensity: 0.3,  r: 168, g: 168, b: 208, accumulated: 0.08 },  // Light lavender
+      { intensity: 0.1,  r: 208, g: 208, b: 232, accumulated: 0.025 },  // Very light
     ];
 
     // ============================================================
@@ -832,20 +832,20 @@
         }
       }
       
-      return bestMatch.intensity / 12;
+      return bestMatch.intensity;
     }
 
-    function intensityToRgb(intensity) {
-      if (intensity >= radarColors[0].intensity) {
+    function accumulatedAmountToRgb(accumulatedAmount) {
+      if (accumulatedAmount >= radarColors[0].accumulated) {
         return { r: radarColors[0].r, g: radarColors[0].g, b: radarColors[0].b };
       }
       
       for (let i = 0; i < radarColors.length - 1; i++) {
-        if (intensity >= radarColors[i + 1].intensity) {
+        if (accumulatedAmount >= radarColors[i + 1].accumulated) {
           const lower = radarColors[i + 1];
           const upper = radarColors[i];
-          const range = upper.intensity - lower.intensity;
-          const t = (intensity - lower.intensity) / range;
+          const range = upper.accumulated - lower.accumulated;
+          const t = (accumulatedAmount - lower.accumulated) / range;
           
           return {
             r: Math.round(lower.r + (upper.r - lower.r) * t),
@@ -900,7 +900,7 @@
         div.className = 'legend-item';
         div.innerHTML = `
           <div class="legend-color" style="background: rgb(${item.r}, ${item.g}, ${item.b})"></div>
-          <span class="legend-label">${item.intensity} mm</span>
+          <span class="legend-label">${item.accumulated} mm</span>
         `;
         legend.appendChild(div);
       }
@@ -998,7 +998,7 @@
       canvas.height = height;
       
       // Create intensity accumulation matrix
-      const intensityMatrix = new Float32Array(width * height);
+      const accumulatedMatrix = new Float32Array(width * height);
       const hitCount = new Uint16Array(width * height);
       
       // Create temp canvas
@@ -1026,7 +1026,7 @@
           
           if (isPixelColored(r, g, b, a)) {
             const intensity = rgbToIntensity(r, g, b);
-            intensityMatrix[pixelIndex] += intensity;
+            accumulatedMatrix[pixelIndex] += intensity / 12 // convert mm/5min to mm amount;
             hitCount[pixelIndex]++;
           }
         }
@@ -1042,21 +1042,21 @@
       // Create result image
       const resultData = ctx.createImageData(width, height);
       
-      for (let pixelIndex = 0; pixelIndex < intensityMatrix.length; pixelIndex++) {
+      for (let pixelIndex = 0; pixelIndex < accumulatedMatrix.length; pixelIndex++) {
         const i = pixelIndex * 4;
-        const intensity = intensityMatrix[pixelIndex];
+        const accumulatedAmount = accumulatedMatrix[pixelIndex];
         const hits = hitCount[pixelIndex];
         
-        if (intensity > 0) {
-          const color = intensityToRgb(intensity);
+        if (accumulatedAmount > 0) {
+          const color = accumulatedAmountToRgb(accumulatedAmount);
           
           resultData.data[i] = color.r;
           resultData.data[i + 1] = color.g;
           resultData.data[i + 2] = color.b;
           resultData.data[i + 3] = 255;
           
-          if (intensity > stats.maxRainfall) {
-            stats.maxRainfall = intensity;
+          if (accumulatedAmount > stats.maxRainfall) {
+            stats.maxRainfall = accumulatedAmount;
           }
           
           if (hits > 1) {
