@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radar Image Combiner</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;500;700&display=swap');
+    
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1e293b;
+      --accent-cyan: #22d3ee;
+      --accent-emerald: #10b981;
+      --accent-violet: #8b5cf6;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border-color: #334155;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* Animated gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    /* Grid pattern overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeInDown 0.8s ease-out;
+    }
+    
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    
+    .subtitle {
+      color: var(--text-secondary);
+      font-weight: 300;
+      font-size: 1.1rem;
+    }
+    
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 2rem;
+      animation: fadeIn 1s ease-out 0.3s both;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .canvas-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .canvas-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    }
+    
+    .canvas-container {
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+    }
+    
+    #resultCanvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    .controls-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    .panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    
+    .panel-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-cyan);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
+      color: var(--bg-primary);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(34, 211, 238, 0.3);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    
+    .btn-secondary:hover {
+      border-color: var(--accent-violet);
+      background: rgba(139, 92, 246, 0.1);
+    }
+    
+    .progress-container {
+      margin-top: 1rem;
+    }
+    
+    .progress-bar {
+      height: 4px;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    
+    .stat-item {
+      background: var(--bg-tertiary);
+      padding: 0.75rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+    
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 0.25rem;
+    }
+    
+    .log-panel {
+      flex: 1;
+      min-height: 200px;
+      max-height: 300px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .log-content {
+      flex: 1;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      background: var(--bg-primary);
+      border-radius: 6px;
+      padding: 0.75rem;
+    }
+    
+    .log-entry {
+      color: var(--text-secondary);
+      animation: slideIn 0.2s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .log-entry.success { color: var(--accent-emerald); }
+    .log-entry.error { color: #f87171; }
+    .log-entry.info { color: var(--accent-cyan); }
+    .log-entry.warning { color: #fbbf24; }
+    
+    .color-map-info {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    
+    .color-map-info code {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-tertiary);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>☁️ Radar Image Combiner</h1>
+      <p class="subtitle">Overlay weather radar images with custom color blending</p>
+    </header>
+    
+    <div class="main-grid">
+      <div class="canvas-section">
+        <div class="canvas-container">
+          <canvas id="resultCanvas"></canvas>
+        </div>
+      </div>
+      
+      <div class="controls-section">
+        <div class="panel">
+          <div class="panel-title">Controls</div>
+          <button id="processBtn" class="btn btn-primary">
+            <span id="btnText">Process Images</span>
+          </button>
+          <div class="progress-container" id="progressContainer" style="display: none;">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Loading...</div>
+          </div>
+        </div>
+        
+        <div class="panel">
+          <div class="panel-title">Statistics</div>
+          <div class="stats">
+            <div class="stat-item">
+              <div class="stat-value" id="totalImages">0</div>
+              <div class="stat-label">Total Images</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="loadedImages">0</div>
+              <div class="stat-label">Loaded</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="coloredPixels">0</div>
+              <div class="stat-label">Colored Pixels</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="overlaps">0</div>
+              <div class="stat-label">Overlaps</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="panel">
+          <div class="panel-title">Color Combination</div>
+          <div class="color-map-info">
+            <p>Pixels are combined using a custom blending function. Currently using additive overlay.</p>
+            <p style="margin-top: 0.5rem;">Edit the <code>combineColors()</code> function in the code to customize blending rules.</p>
+          </div>
+        </div>
+        
+        <div class="panel log-panel">
+          <div class="panel-title">Activity Log</div>
+          <div class="log-content" id="logContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Radar image data (from JSON)
+    const radarData = {
+      "path": "pics/radar-clouds-ims/",
+      "update_time": "10:40 07/11/2025",
+      "images": [
+        {"name": "1765054502.png", "time": "יום שבת 22:55 06/12/2025"},
+        {"name": "1765054803.png", "time": "יום שבת 23:00 06/12/2025"},
+        {"name": "1765055103.png", "time": "יום שבת 23:05 06/12/2025"},
+        {"name": "1765055402.png", "time": "יום שבת 23:10 06/12/2025"},
+        {"name": "1765055703.png", "time": "יום שבת 23:15 06/12/2025"},
+        {"name": "1765056003.png", "time": "יום שבת 23:20 06/12/2025"},
+        {"name": "1765056302.png", "time": "יום שבת 23:25 06/12/2025"},
+        {"name": "1765056603.png", "time": "יום שבת 23:30 06/12/2025"},
+        {"name": "1765056903.png", "time": "יום שבת 23:35 06/12/2025"},
+        {"name": "1765057203.png", "time": "יום שבת 23:40 06/12/2025"},
+        {"name": "1765057502.png", "time": "יום שבת 23:45 06/12/2025"},
+        {"name": "1765057803.png", "time": "יום שבת 23:50 06/12/2025"},
+        {"name": "1765058103.png", "time": "יום שבת 23:55 06/12/2025"},
+        {"name": "1765058403.png", "time": "יום ראשון 00:00 07/12/2025"},
+        {"name": "1765058702.png", "time": "יום ראשון 00:05 07/12/2025"},
+        {"name": "1765059003.png", "time": "יום ראשון 00:10 07/12/2025"},
+        {"name": "1765059302.png", "time": "יום ראשון 00:15 07/12/2025"},
+        {"name": "1765059603.png", "time": "יום ראשון 00:20 07/12/2025"},
+        {"name": "1765059902.png", "time": "יום ראשון 00:25 07/12/2025"},
+        {"name": "1765060203.png", "time": "יום ראשון 00:30 07/12/2025"}
+        // Add more images as needed - using first 20 for demo
+      ]
+    };
+
+    const BASE_URL = 'https://www.weather2day.co.il/';
+    
+    // DOM Elements
+    const canvas = document.getElementById('resultCanvas');
+    const ctx = canvas.getContext('2d');
+    const processBtn = document.getElementById('processBtn');
+    const btnText = document.getElementById('btnText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const logContent = document.getElementById('logContent');
+    
+    // Stats
+    let stats = {
+      totalImages: 0,
+      loadedImages: 0,
+      coloredPixels: 0,
+      overlaps: 0
+    };
+
+    // ============================================================
+    // COLOR COMBINATION FUNCTION - CUSTOMIZE THIS!
+    // ============================================================
+    // This function is called when two colored pixels overlap.
+    // Parameters:
+    //   color1: {r, g, b, a} - First pixel color (existing)
+    //   color2: {r, g, b, a} - Second pixel color (new)
+    // Returns:
+    //   {r, g, b, a} - Combined color
+    // 
+    // Example rules you can implement:
+    //   blue + blue = purple
+    //   green + blue = cyan
+    //   etc.
+    // ============================================================
+    function combineColors(color1, color2) {
+      // Default: Additive blending with max intensity tracking
+      // This creates a "heat map" effect where more overlaps = more intense
+      
+      // You can identify colors and apply custom rules:
+      const isBlue1 = color1.b > color1.r && color1.b > color1.g;
+      const isBlue2 = color2.b > color2.r && color2.b > color2.g;
+      const isGreen1 = color1.g > color1.r && color1.g > color1.b;
+      const isGreen2 = color2.g > color2.r && color2.g > color2.b;
+      const isRed1 = color1.r > color1.g && color1.r > color1.b;
+      const isRed2 = color2.r > color2.g && color2.r > color2.b;
+      
+      // Example: blue + blue = purple (shift toward magenta)
+      if (isBlue1 && isBlue2) {
+        return {
+          r: Math.min(255, (color1.r + color2.r) / 2 + 80), // Add red for purple
+          g: Math.min(255, (color1.g + color2.g) / 2),
+          b: Math.min(255, (color1.b + color2.b) / 2),
+          a: Math.max(color1.a, color2.a)
+        };
+      }
+      
+      // Default: screen blend mode (brightens overlaps)
+      return {
+        r: Math.min(255, 255 - ((255 - color1.r) * (255 - color2.r)) / 255),
+        g: Math.min(255, 255 - ((255 - color1.g) * (255 - color2.g)) / 255),
+        b: Math.min(255, 255 - ((255 - color1.b) * (255 - color2.b)) / 255),
+        a: Math.max(color1.a, color2.a)
+      };
+    }
+
+    // Check if a pixel is considered "clear" (transparent or nearly transparent)
+    function isPixelClear(r, g, b, a) {
+      // Consider pixel clear if alpha is low or it's very close to transparent
+      return a < 10;
+    }
+
+    // Check if a pixel is considered "colored" (not clear)
+    function isPixelColored(r, g, b, a) {
+      return a >= 10;
+    }
+
+    // Logging utility
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(entry);
+      logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    // Update stats display
+    function updateStats() {
+      document.getElementById('totalImages').textContent = stats.totalImages;
+      document.getElementById('loadedImages').textContent = stats.loadedImages;
+      document.getElementById('coloredPixels').textContent = stats.coloredPixels.toLocaleString();
+      document.getElementById('overlaps').textContent = stats.overlaps.toLocaleString();
+    }
+
+    // Load image via CORS proxy (needed for cross-origin images)
+    async function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        // Using a CORS proxy - you may need to use a different one
+        // or set up your own proxy server
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          // Try direct load as fallback (might work if CORS is enabled)
+          const directImg = new Image();
+          directImg.crossOrigin = 'anonymous';
+          directImg.onload = () => resolve(directImg);
+          directImg.onerror = () => reject(new Error(`Failed to load: ${url}`));
+          directImg.src = url;
+        };
+        img.src = proxyUrl;
+      });
+    }
+
+    // Main processing function
+    async function processImages() {
+      processBtn.disabled = true;
+      btnText.innerHTML = '<span class="spinner"></span> Processing...';
+      progressContainer.style.display = 'block';
+      
+      // Reset stats
+      stats = {
+        totalImages: radarData.images.length,
+        loadedImages: 0,
+        coloredPixels: 0,
+        overlaps: 0
+      };
+      updateStats();
+      
+      log('Starting image processing...', 'info');
+      
+      const images = [];
+      const imageUrls = radarData.images.map(img => BASE_URL + radarData.path + img.name);
+      
+      // Load all images
+      for (let i = 0; i < imageUrls.length; i++) {
+        const url = imageUrls[i];
+        const imageName = radarData.images[i].name;
+        
+        try {
+          const img = await loadImage(url);
+          images.push(img);
+          stats.loadedImages++;
+          
+          const progress = ((i + 1) / imageUrls.length) * 100;
+          progressFill.style.width = `${progress}%`;
+          progressText.textContent = `Loading image ${i + 1}/${imageUrls.length}`;
+          
+          log(`Loaded: ${imageName}`, 'success');
+        } catch (error) {
+          log(`Failed: ${imageName} - ${error.message}`, 'error');
+        }
+        
+        updateStats();
+      }
+      
+      if (images.length === 0) {
+        log('No images loaded. Check CORS settings or try a different proxy.', 'error');
+        processBtn.disabled = false;
+        btnText.textContent = 'Process Images';
+        return;
+      }
+      
+      log(`Combining ${images.length} images...`, 'info');
+      progressText.textContent = 'Combining images...';
+      
+      // Set canvas size based on first image
+      const width = images[0].width;
+      const height = images[0].height;
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Create result image data (starts transparent)
+      const resultData = ctx.createImageData(width, height);
+      
+      // Track which pixels have been colored (for overlap detection)
+      const coloredMap = new Uint8Array(width * height);
+      
+      // Process each image
+      for (const img of images) {
+        // Draw image to temp canvas to get pixel data
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0);
+        
+        const imgData = tempCtx.getImageData(0, 0, width, height);
+        
+        // Process each pixel
+        for (let i = 0; i < imgData.data.length; i += 4) {
+          const r = imgData.data[i];
+          const g = imgData.data[i + 1];
+          const b = imgData.data[i + 2];
+          const a = imgData.data[i + 3];
+          
+          const pixelIndex = i / 4;
+          
+          if (isPixelColored(r, g, b, a)) {
+            if (coloredMap[pixelIndex]) {
+              // Pixel already has color - combine!
+              stats.overlaps++;
+              
+              const existingColor = {
+                r: resultData.data[i],
+                g: resultData.data[i + 1],
+                b: resultData.data[i + 2],
+                a: resultData.data[i + 3]
+              };
+              
+              const newColor = { r, g, b, a };
+              const combined = combineColors(existingColor, newColor);
+              
+              resultData.data[i] = combined.r;
+              resultData.data[i + 1] = combined.g;
+              resultData.data[i + 2] = combined.b;
+              resultData.data[i + 3] = combined.a;
+            } else {
+              // First color for this pixel
+              stats.coloredPixels++;
+              coloredMap[pixelIndex] = 1;
+              
+              resultData.data[i] = r;
+              resultData.data[i + 1] = g;
+              resultData.data[i + 2] = b;
+              resultData.data[i + 3] = a;
+            }
+          }
+        }
+      }
+      
+      // Draw result
+      ctx.putImageData(resultData, 0, 0);
+      
+      updateStats();
+      log(`Done! ${stats.coloredPixels} colored pixels, ${stats.overlaps} overlaps`, 'success');
+      
+      progressText.textContent = 'Complete!';
+      processBtn.disabled = false;
+      btnText.textContent = 'Process Images';
+    }
+
+    // Event listeners
+    processBtn.addEventListener('click', processImages);
+    
+    // Initialize
+    stats.totalImages = radarData.images.length;
+    updateStats();
+    log('Ready. Click "Process Images" to start.', 'info');
+  </script>
+</body>
+</html>
+
