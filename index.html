@@ -270,6 +270,32 @@
     .log-entry.error { color: #f87171; }
     .log-entry.info { color: var(--accent-cyan); }
     
+    /* Footer */
+    .app-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-primary);
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+    }
+    
+    .app-footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+    
+    .app-footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .app-footer .disclaimer {
+      margin-top: 0.35rem;
+      font-size: 0.6rem;
+      opacity: 0.8;
+    }
+    
     /* Time Range Slider */
     .time-range-container {
       padding: 0.5rem 0;
@@ -562,6 +588,11 @@
         <div class="panel-title">Activity Log</div>
         <div class="log-content" id="logContent"></div>
       </div>
+      
+      <footer class="app-footer">
+        <p>Open source project under <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></p>
+        <p class="disclaimer">Provided "as is" without warranty. Use at your own risk. Radar data © <a href="https://www.weather2day.co.il" target="_blank">Weather2day</a> / IMS.</p>
+      </footer>
     </div>
   </div>
   
