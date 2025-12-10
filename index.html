@@ -483,6 +483,16 @@
       border-radius: 4px;
     }
     
+    /* Basin tooltip */
+    .basin-tooltip {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #6B7280;
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    
     /* Layer toggle */
     .layer-toggle {
       display: flex;
@@ -611,10 +621,14 @@
       </div>
       
       <div class="panel">
-        <div class="panel-title">Layers</div>
+        <div class="panel-title">Hydrology Layers</div>
         <label class="layer-toggle">
-          <input type="checkbox" id="riversToggle" checked>
-          <span class="toggle-label">🌊 Rivers & Streams</span>
+          <input type="checkbox" id="basinsToggle" checked>
+          <span class="toggle-label">📍 Drainage Basins</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="streamsToggle">
+          <span class="toggle-label">🌊 Streams</span>
         </label>
       </div>
       
@@ -785,50 +799,82 @@
     let radarOverlay = null;
     
     // ============================================================
-    // RIVERS/WATERWAYS LAYER (via OpenStreetMap Overpass API)
+    // HYDROLOGY LAYERS (Israel Water Authority - local files)
     // ============================================================
-    let riversLayer = L.layerGroup().addTo(map);
-    let riversLoaded = false;
+    const BASINS_URL = 'data/basins.geojson';
+    const STREAMS_URL = 'data/streams.geojson';
     
-    async function loadRivers() {
-      if (riversLoaded) return;
+    let basinsLayer = L.layerGroup().addTo(map); // Basins visible by default
+    let streamsLayer = L.layerGroup();
+    let basinsLoaded = false;
+    let streamsLoaded = false;
+    
+    async function loadBasins() {
+      if (basinsLoaded) return;
       
-      log('Loading rivers from OpenStreetMap...', 'info');
-      
-      // Israel bounding box (south,west,north,east)
-      const bbox = '29.5,34.2,33.3,35.9';
-      
-      const query = `[out:json][timeout:60];(way["waterway"="river"](${bbox});way["waterway"="stream"]["name"](${bbox});way["waterway"="wadi"]["name"](${bbox}););out body;>;out skel qt;`;
+      log('Loading drainage basins...', 'info');
       
       try {
-        const response = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'data=' + encodeURIComponent(query)
-        });
+        const response = await fetch(BASINS_URL);
         
-        if (!response.ok) throw new Error('Overpass API error');
+        if (!response.ok) throw new Error('Failed to fetch basins');
         
-        const data = await response.json();
+        const geojson = await response.json();
         
-        // Convert Overpass data to GeoJSON
-        const geojson = overpassToGeoJSON(data);
-        
-        // Add to layer
         L.geoJSON(geojson, {
           style: function(feature) {
-            const waterway = feature.properties?.waterway || '';
             return {
-              color: '#2196F3',
-              weight: waterway === 'river' ? 3 : 1.5,
-              opacity: 0.7,
-              fillOpacity: 0
+              color: '#6B7280',
+              weight: 3,
+              opacity: 0.9,
+              fillColor: '#6B7280',
+              fillOpacity: 0.05
             };
           },
           onEachFeature: function(feature, layer) {
-            const name = feature.properties?.name || feature.properties?.['name:he'] || '';
+            const name = feature.properties?.name || feature.properties?.Name || '';
+            if (name) {
+              layer.bindTooltip(name, {
+                permanent: false,
+                direction: 'center',
+                className: 'basin-tooltip'
+              });
+            }
+          }
+        }).addTo(basinsLayer);
+        
+        basinsLoaded = true;
+        log(`Loaded ${geojson.features?.length || 0} drainage basins`, 'success');
+        
+      } catch (error) {
+        log('Failed to load basins: ' + error.message, 'error');
+      }
+    }
+    
+    async function loadStreams() {
+      if (streamsLoaded) return;
+      
+      log('Loading streams...', 'info');
+      
+      try {
+        const response = await fetch(STREAMS_URL);
+        
+        if (!response.ok) throw new Error('Failed to fetch streams');
+        
+        const geojson = await response.json();
+        
+        L.geoJSON(geojson, {
+          style: function(feature) {
+            // Style based on stream order if available
+            const order = feature.properties?.order || feature.properties?.strahler || 1;
+            return {
+              color: '#2196F3',
+              weight: order+2,
+              opacity: 0.7
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const name = feature.properties?.name || feature.properties?.Name || '';
             if (name) {
               layer.bindTooltip(name, {
                 permanent: false,
@@ -837,55 +883,17 @@
               });
             }
           }
-        }).addTo(riversLayer);
+        }).addTo(streamsLayer);
         
-        riversLoaded = true;
-        log(`Loaded ${geojson.features.length} waterways`, 'success');
+        streamsLoaded = true;
+        log(`Loaded ${geojson.features?.length || 0} streams`, 'success');
         
       } catch (error) {
-        log('Failed to load rivers: ' + error.message, 'error');
+        log('Failed to load streams: ' + error.message, 'error');
       }
     }
     
-    // Convert Overpass JSON to GeoJSON
-    function overpassToGeoJSON(data) {
-      const nodes = {};
-      const features = [];
-      
-      // Index all nodes
-      for (const element of data.elements) {
-        if (element.type === 'node') {
-          nodes[element.id] = [element.lon, element.lat];
-        }
-      }
-      
-      // Convert ways to GeoJSON LineStrings
-      for (const element of data.elements) {
-        if (element.type === 'way' && element.nodes) {
-          const coordinates = element.nodes
-            .map(nodeId => nodes[nodeId])
-            .filter(coord => coord !== undefined);
-          
-          if (coordinates.length >= 2) {
-            features.push({
-              type: 'Feature',
-              properties: element.tags || {},
-              geometry: {
-                type: 'LineString',
-                coordinates: coordinates
-              }
-            });
-          }
-        }
-      }
-      
-      return {
-        type: 'FeatureCollection',
-        features: features
-      };
-    }
-    
-    // Rivers will be loaded after DOM elements are ready (see INITIALIZE section)
+    // Load hydrology layers (called from INITIALIZE section)
     
     // ============================================================
     // DOM ELEMENTS
@@ -1314,13 +1322,24 @@
     // ============================================================
     refreshBtn.addEventListener('click', refreshData);
     
-    // Rivers layer toggle
-    const riversToggle = document.getElementById('riversToggle');
-    riversToggle.addEventListener('change', (e) => {
+    // Hydrology layer toggles
+    const streamsToggle = document.getElementById('streamsToggle');
+    const basinsToggle = document.getElementById('basinsToggle');
+    
+    streamsToggle.addEventListener('change', (e) => {
       if (e.target.checked) {
-        riversLayer.addTo(map);
+        streamsLayer.addTo(map);
+        if (!streamsLoaded) loadStreams(); // Lazy load streams
       } else {
-        map.removeLayer(riversLayer);
+        map.removeLayer(streamsLayer);
+      }
+    });
+    
+    basinsToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        basinsLayer.addTo(map);
+      } else {
+        map.removeLayer(basinsLayer);
       }
     });
     
@@ -1348,8 +1367,8 @@
     // ============================================================
     buildLegend();
     
-    // Load rivers layer
-    loadRivers();
+    // Load basins layer (streams loaded on demand)
+    loadBasins();
     
     // Disable refresh button until initial data is loaded
     refreshBtn.disabled = true;
