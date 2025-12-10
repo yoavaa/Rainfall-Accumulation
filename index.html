@@ -270,6 +270,126 @@
     .log-entry.error { color: #f87171; }
     .log-entry.info { color: var(--accent-cyan); }
     
+    /* Time Range Slider */
+    .time-range-container {
+      padding: 0.5rem 0;
+    }
+    
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    
+    .time-label-box {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      text-align: center;
+      min-width: 100px;
+    }
+    
+    .time-label-title {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    
+    .time-label-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+    }
+    
+    .range-slider-container {
+      position: relative;
+      height: 40px;
+      margin: 0.5rem 0;
+    }
+    
+    .range-track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      transform: translateY(-50%);
+    }
+    
+    .range-selected {
+      position: absolute;
+      top: 50%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      border-radius: 3px;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    
+    .range-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-appearance: none;
+      background: transparent;
+      pointer-events: none;
+    }
+    
+    .range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 2px 8px rgba(34, 211, 238, 0.4);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .range-input::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(34, 211, 238, 0.6);
+    }
+    
+    .range-input::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-cyan);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    
+    .range-input.range-max::-webkit-slider-thumb {
+      background: var(--accent-emerald);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+    
+    .range-input.range-max::-webkit-slider-thumb:hover {
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+    }
+    
+    .selected-count {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 0.5rem;
+    }
+    
+    .selected-count span {
+      color: var(--accent-emerald);
+      font-weight: 600;
+    }
+    
     /* Spinner */
     .spinner {
       width: 16px;
@@ -337,6 +457,29 @@
       <div class="sidebar-header">
         <h1>☁️ Rainfall Accumulation</h1>
         <p class="subtitle">Overlay radar data on interactive map</p>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Time Range</div>
+        <div class="time-range-container">
+          <div class="time-labels">
+            <div class="time-label-box">
+              <div class="time-label-title">From</div>
+              <div class="time-label-value" id="fromLabel">--:--</div>
+            </div>
+            <div class="time-label-box">
+              <div class="time-label-title">To</div>
+              <div class="time-label-value" id="toLabel">--:--</div>
+            </div>
+          </div>
+          <div class="range-slider-container">
+            <div class="range-track"></div>
+            <div class="range-selected" id="rangeSelected"></div>
+            <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
+            <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
+          </div>
+          <div class="selected-count"><span id="selectedCount">140</span> images selected</div>
+        </div>
       </div>
       
       <div class="panel">
@@ -622,6 +765,12 @@
     const logContent = document.getElementById('logContent');
     const opacitySlider = document.getElementById('opacitySlider');
     const opacityValue = document.getElementById('opacityValue');
+    const rangeMin = document.getElementById('rangeMin');
+    const rangeMax = document.getElementById('rangeMax');
+    const rangeSelected = document.getElementById('rangeSelected');
+    const fromLabel = document.getElementById('fromLabel');
+    const toLabel = document.getElementById('toLabel');
+    const selectedCount = document.getElementById('selectedCount');
     
     // Stats
     let stats = {
@@ -630,6 +779,83 @@
       maxRainfall: 0,
       overlaps: 0
     };
+
+    // ============================================================
+    // DATE/TIME PARSING AND FILTERING
+    // ============================================================
+    // Parse Hebrew datetime string like "יום רביעי 08:30 10/12/2025"
+    function parseHebrewDateTime(hebrewStr) {
+      // Extract time and date using regex
+      const match = hebrewStr.match(/(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return null;
+      
+      const [, hours, minutes, day, month, year] = match;
+      return new Date(year, month - 1, day, hours, minutes);
+    }
+    
+    // Parse images and add Date objects
+    function parseImageDates() {
+      for (const img of radarData.images) {
+        img.date = parseHebrewDateTime(img.time);
+      }
+    }
+    
+    // Format date for display
+    function formatDateDisplay(date) {
+      if (!date) return '--:--';
+      const pad = n => n.toString().padStart(2, '0');
+      return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    
+    // Get filtered images based on slider range
+    function getFilteredImages() {
+      const minIdx = parseInt(rangeMin.value);
+      const maxIdx = parseInt(rangeMax.value);
+      return radarData.images.slice(minIdx, maxIdx + 1);
+    }
+    
+    // Update range slider visual and labels
+    function updateRangeSlider() {
+      const minVal = parseInt(rangeMin.value);
+      const maxVal = parseInt(rangeMax.value);
+      const total = radarData.images.length - 1;
+      
+      // Ensure min doesn't exceed max
+      if (minVal > maxVal) {
+        rangeMin.value = maxVal;
+      }
+      
+      const minPercent = (Math.min(minVal, maxVal) / total) * 100;
+      const maxPercent = (Math.max(minVal, maxVal) / total) * 100;
+      
+      rangeSelected.style.left = minPercent + '%';
+      rangeSelected.style.width = (maxPercent - minPercent) + '%';
+      
+      // Update labels
+      const fromImg = radarData.images[Math.min(minVal, maxVal)];
+      const toImg = radarData.images[Math.max(minVal, maxVal)];
+      
+      fromLabel.textContent = formatDateDisplay(fromImg?.date);
+      toLabel.textContent = formatDateDisplay(toImg?.date);
+      
+      // Update count
+      const count = Math.abs(maxVal - minVal) + 1;
+      selectedCount.textContent = count;
+      document.getElementById('totalImages').textContent = count;
+    }
+    
+    // Initialize range slider
+    function initDatePickers() {
+      parseImageDates();
+      
+      const maxIdx = radarData.images.length - 1;
+      rangeMin.max = maxIdx;
+      rangeMax.max = maxIdx;
+      rangeMin.value = 0;
+      rangeMax.value = maxIdx;
+      
+      updateRangeSlider();
+    }
 
     // ============================================================
     // COLOR FUNCTIONS
@@ -766,23 +992,34 @@
       btnText.innerHTML = '<span class="spinner"></span> Processing...';
       progressContainer.style.display = 'block';
       
+      // Get filtered images based on date range
+      const filteredImages = getFilteredImages();
+      
+      if (filteredImages.length === 0) {
+        log('No images in selected time range.', 'error');
+        processBtn.disabled = false;
+        btnText.textContent = 'Process & Overlay';
+        progressContainer.style.display = 'none';
+        return;
+      }
+      
       stats = {
-        totalImages: radarData.images.length,
+        totalImages: filteredImages.length,
         loadedImages: 0,
         maxRainfall: 0,
         overlaps: 0
       };
       updateStats();
       
-      log('Starting image processing...', 'info');
+      log(`Processing ${filteredImages.length} images from selected time range...`, 'info');
       
       const images = [];
-      const imageUrls = radarData.images.map(img => BASE_URL + radarData.path + img.name);
+      const imageUrls = filteredImages.map(img => BASE_URL + radarData.path + img.name);
       
       // Load all images
       for (let i = 0; i < imageUrls.length; i++) {
         const url = imageUrls[i];
-        const imageName = radarData.images[i].name;
+        const imageName = filteredImages[i].name;
         
         try {
           const img = await loadImage(url);
@@ -925,13 +1162,17 @@
         radarOverlay.setOpacity(value / 100);
       }
     });
+    
+    // Range slider listeners
+    rangeMin.addEventListener('input', updateRangeSlider);
+    rangeMax.addEventListener('input', updateRangeSlider);
 
     // ============================================================
     // INITIALIZE
     // ============================================================
-    updateStats();
+    initDatePickers();
     buildLegend();
-    log('Ready. Click "Process & Overlay" to start.', 'info');
+    log('Ready. Select time range and click "Process & Overlay".', 'info');
   </script>
 </body>
 </html>
