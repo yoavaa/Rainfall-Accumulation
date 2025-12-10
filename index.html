@@ -526,7 +526,7 @@
       </div>
       
       <div class="panel">
-        <div class="panel-title">Rainfall Legend (mm)</div>
+        <div class="panel-title">Accumulated Rainfall (mm)</div>
         <div class="legend" id="legend"></div>
       </div>
       
@@ -938,25 +938,13 @@
       const legend = document.getElementById('legend');
       legend.innerHTML = '';
       
-      // Show subset of legend items
-      const legendItems = [
-        { intensity: 200, label: '200+' },
-        { intensity: 100, label: '100' },
-        { intensity: 50, label: '50' },
-        { intensity: 24, label: '24' },
-        { intensity: 9, label: '9' },
-        { intensity: 4, label: '4' },
-        { intensity: 1.2, label: '1.2' },
-        { intensity: 0.1, label: '0.1' },
-      ];
-      
-      for (const item of legendItems) {
-        const color = intensityToRgb(item.intensity);
+      // Show all radar colors from the table
+      for (const item of radarColors) {
         const div = document.createElement('div');
         div.className = 'legend-item';
         div.innerHTML = `
-          <div class="legend-color" style="background: rgb(${color.r}, ${color.g}, ${color.b})"></div>
-          <span class="legend-label">${item.label} mm</span>
+          <div class="legend-color" style="background: rgb(${item.r}, ${item.g}, ${item.b})"></div>
+          <span class="legend-label">${item.intensity} mm</span>
         `;
         legend.appendChild(div);
       }
