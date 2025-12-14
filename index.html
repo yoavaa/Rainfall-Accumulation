@@ -1215,10 +1215,23 @@
     // MAIN PROCESSING
     // ============================================================
     let isProcessing = false;
+    let abortProcessing = false;
+    let currentProcessingId = 0;
     
     async function processImages() {
-      if (isProcessing) return; // Prevent concurrent processing
+      // If already processing, abort the previous run
+      if (isProcessing) {
+        abortProcessing = true;
+        // Wait a bit for the previous loop to notice the abort
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       if (radarData.images.length === 0) return; // No data yet
+      
+      // Start new processing with unique ID
+      currentProcessingId++;
+      const thisProcessingId = currentProcessingId;
+      abortProcessing = false;
       
       isProcessing = true;
       progressContainer.style.display = 'block';
@@ -1248,6 +1261,13 @@
       
       // Load all images
       for (let i = 0; i < imageUrls.length; i++) {
+        // Check if we should abort (new processing started)
+        if (abortProcessing || thisProcessingId !== currentProcessingId) {
+          log('Processing cancelled - new time range selected', 'info');
+          isProcessing = false;
+          return;
+        }
+        
         const url = imageUrls[i];
         const imageName = filteredImages[i].name;
         
@@ -1265,6 +1285,13 @@
         }
         
         updateStats();
+      }
+      
+      // Check abort again before processing
+      if (abortProcessing || thisProcessingId !== currentProcessingId) {
+        log('Processing cancelled', 'info');
+        isProcessing = false;
+        return;
       }
       
       if (images.length === 0) {

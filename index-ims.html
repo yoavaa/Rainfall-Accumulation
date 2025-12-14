@@ -1227,10 +1227,23 @@
     // MAIN PROCESSING
     // ============================================================
     let isProcessing = false;
+    let abortProcessing = false;
+    let currentProcessingId = 0;
     
     async function processImages() {
-      if (isProcessing) return; // Prevent concurrent processing
+      // If already processing, abort the previous run
+      if (isProcessing) {
+        abortProcessing = true;
+        // Wait a bit for the previous loop to notice the abort
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       if (radarData.images.length === 0) return; // No data yet
+      
+      // Start new processing with unique ID
+      currentProcessingId++;
+      const thisProcessingId = currentProcessingId;
+      abortProcessing = false;
       
       isProcessing = true;
       progressContainer.style.display = 'block';
@@ -1260,6 +1273,13 @@
       
       // Load all images
       for (let i = 0; i < imageUrls.length; i++) {
+        // Check if we should abort (new processing started)
+        if (abortProcessing || thisProcessingId !== currentProcessingId) {
+          log('Processing cancelled - new time range selected', 'info');
+          isProcessing = false;
+          return;
+        }
+        
         const url = imageUrls[i];
         const imageName = filteredImages[i].name;
         
@@ -1273,14 +1293,21 @@
           progressText.textContent = `Loading ${i + 1}/${imageUrls.length}`;
           
         } catch (error) {
-          log(`Failed: ${imageName}`, 'error');
+          // Don't log individual failures to reduce noise
         }
         
         updateStats();
       }
       
+      // Check abort again before processing
+      if (abortProcessing || thisProcessingId !== currentProcessingId) {
+        log('Processing cancelled', 'info');
+        isProcessing = false;
+        return;
+      }
+      
       if (images.length === 0) {
-        log('No images loaded. Check CORS proxy.', 'error');
+        log('No images loaded. Check CORS proxy or try different dates.', 'error');
         isProcessing = false;
         return;
       }
@@ -1408,13 +1435,24 @@
       refreshBtn.disabled = true;
       refreshBtnText.innerHTML = '<span class="spinner"></span> Refreshing...';
       
+      // Save current slider positions
+      const currentMin = parseInt(rangeMin.value);
+      const currentMax = parseInt(rangeMax.value);
+      const oldTotal = radarData.images.length;
+      
       // Regenerate image list with current time
       loadRadarData();
       
-      // Reset to 1 day preset
-      clearPresetButtons();
-      document.querySelector('.preset-btn[data-days="1"]').classList.add('active');
-      setTimePreset(1);
+      // Restore relative slider positions (keep same time range)
+      const newTotal = radarData.images.length;
+      if (oldTotal > 0 && newTotal > 0) {
+        // Adjust positions to maintain same relative range
+        const minRatio = currentMin / (oldTotal - 1);
+        const maxRatio = currentMax / (oldTotal - 1);
+        rangeMin.value = Math.round(minRatio * (newTotal - 1));
+        rangeMax.value = Math.round(maxRatio * (newTotal - 1));
+        updateRangeSlider();
+      }
       
       refreshBtn.disabled = false;
       refreshBtnText.textContent = '🔄 Refresh';
