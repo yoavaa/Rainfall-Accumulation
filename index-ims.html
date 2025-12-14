@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMS Radar Rainfall Accumulation (30 Days)</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;500;700&display=swap');
+    
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1e293b;
+      --accent-cyan: #22d3ee;
+      --accent-emerald: #10b981;
+      --accent-violet: #8b5cf6;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border-color: #334155;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .app-container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    /* Map Container */
+    #map {
+      flex: 1;
+      height: 100%;
+      background: #1a1a2e;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    
+    .sidebar-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(139, 92, 246, 0.1));
+    }
+    
+    .sidebar-header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.25rem;
+    }
+    
+    .sidebar-header .subtitle {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-weight: 300;
+    }
+    
+    .panel {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .panel-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-cyan);
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
+      color: var(--bg-primary);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(34, 211, 238, 0.3);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .progress-container {
+      margin-top: 0.75rem;
+    }
+    
+    .progress-bar {
+      height: 4px;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.4rem;
+      text-align: center;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    
+    .stat-item {
+      background: var(--bg-tertiary);
+      padding: 0.6rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+    
+    .stat-label {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 0.15rem;
+    }
+    
+    /* Opacity slider */
+    .opacity-control {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .opacity-control input[type="range"] {
+      flex: 1;
+      height: 4px;
+      -webkit-appearance: none;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      outline: none;
+    }
+    
+    .opacity-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .opacity-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      min-width: 40px;
+      text-align: right;
+    }
+    
+    /* Color Legend */
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .legend-color {
+      width: 20px;
+      height: 12px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    
+    .legend-label {
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+    }
+    
+    /* Log panel */
+    .log-panel {
+      flex: 1;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .log-content {
+      flex: 1;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      line-height: 1.5;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      padding: 0.5rem;
+      max-height: 150px;
+    }
+    
+    .log-entry {
+      color: var(--text-secondary);
+    }
+    
+    .log-entry.success { color: var(--accent-emerald); }
+    .log-entry.error { color: #f87171; }
+    .log-entry.info { color: var(--accent-cyan); }
+    
+    /* Footer */
+    .app-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-primary);
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+    }
+    
+    .app-footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+    
+    .app-footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .app-footer .disclaimer {
+      margin-top: 0.35rem;
+      font-size: 0.6rem;
+      opacity: 0.8;
+    }
+    
+    /* Time Range Slider */
+    .time-range-container {
+      padding: 0.5rem 0;
+    }
+    
+    .preset-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .preset-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .preset-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+    
+    .preset-btn.active {
+      background: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      color: var(--bg-primary);
+    }
+    
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    
+    .playback-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .playback-btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-cyan);
+    }
+    
+    .playback-btn.play-btn {
+      width: 42px;
+      height: 42px;
+      background: var(--accent-emerald);
+      border-color: var(--accent-emerald);
+      color: var(--bg-primary);
+    }
+    
+    .playback-btn.play-btn:hover {
+      filter: brightness(1.1);
+    }
+    
+    .playback-btn.play-btn.playing {
+      background: #f59e0b;
+      border-color: #f59e0b;
+    }
+    
+    .playback-label {
+      flex: 1;
+      text-align: right;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    
+    .time-label-box {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      text-align: center;
+      min-width: 100px;
+    }
+    
+    .time-label-title {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    
+    .time-label-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+    }
+    
+    .range-slider-container {
+      position: relative;
+      height: 40px;
+      margin: 0.5rem 0;
+    }
+    
+    .range-track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      transform: translateY(-50%);
+    }
+    
+    .range-selected {
+      position: absolute;
+      top: 50%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      border-radius: 3px;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    
+    .range-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-appearance: none;
+      background: transparent;
+      pointer-events: none;
+    }
+    
+    .range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 2px 8px rgba(34, 211, 238, 0.4);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .range-input::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(34, 211, 238, 0.6);
+    }
+    
+    .range-input::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-cyan);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    
+    .range-input.range-max::-webkit-slider-thumb {
+      background: var(--accent-emerald);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+    
+    .range-input.range-max::-webkit-slider-thumb:hover {
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+    }
+    
+    .selected-count {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 0.5rem;
+    }
+    
+    .selected-count span {
+      color: var(--accent-emerald);
+      font-weight: 600;
+    }
+    
+    /* Spinner */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Leaflet customization */
+    .leaflet-control-attribution {
+      font-size: 10px !important;
+      background: rgba(17, 24, 39, 0.8) !important;
+      color: var(--text-secondary) !important;
+    }
+    
+    .leaflet-control-attribution a {
+      color: var(--accent-cyan) !important;
+    }
+    
+    .leaflet-control-zoom a {
+      background: var(--bg-secondary) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border-color) !important;
+    }
+    
+    .leaflet-control-zoom a:hover {
+      background: var(--bg-tertiary) !important;
+    }
+    
+    /* Layer control styling */
+    .leaflet-control-layers {
+      background: rgba(10, 14, 23, 0.9) !important;
+      border: 1px solid var(--border-color) !important;
+      border-radius: 8px !important;
+      padding: 8px 12px !important;
+    }
+    
+    .leaflet-control-layers-base label {
+      color: var(--text-primary) !important;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      cursor: pointer;
+    }
+    
+    .leaflet-control-layers-base input {
+      accent-color: var(--accent-cyan);
+    }
+    
+    /* River tooltip */
+    .river-tooltip {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #2196F3;
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    
+    /* Basin tooltip */
+    .basin-tooltip {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #6B7280;
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    
+    /* Layer toggle */
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      padding: 0.5rem 0;
+    }
+    
+    .layer-toggle input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+    
+    .toggle-label {
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    
+    /* Hidden canvas for processing */
+    #processingCanvas {
+      display: none;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column;
+      }
+      
+      #map {
+        height: 50%;
+        min-height: 300px;
+      }
+      
+      .sidebar {
+        width: 100%;
+        height: 50%;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+        overflow-y: auto;
+      }
+      
+      .sidebar-header h1 {
+        font-size: 1rem;
+      }
+      
+      .panel {
+        padding: 0.75rem 1rem;
+      }
+      
+      .stats {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      
+      .stat-item {
+        padding: 0.4rem;
+      }
+      
+      .stat-value {
+        font-size: 0.9rem;
+      }
+      
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div id="map"></div>
+    
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h1>☁️ IMS Rainfall Accumulation</h1>
+        <p class="subtitle">30-day historical radar data</p>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Time Range</div>
+        <div class="time-range-container">
+          <div class="preset-buttons">
+            <button class="preset-btn active" data-days="1">1d</button>
+            <button class="preset-btn" data-days="7">7d</button>
+            <button class="preset-btn" data-days="14">14d</button>
+            <button class="preset-btn" data-days="30">30d</button>
+          </div>
+          <div class="time-labels">
+            <div class="time-label-box">
+              <div class="time-label-title">From</div>
+              <div class="time-label-value" id="fromLabel">--:--</div>
+            </div>
+            <div class="time-label-box">
+              <div class="time-label-title">To</div>
+              <div class="time-label-value" id="toLabel">--:--</div>
+            </div>
+          </div>
+          <div class="range-slider-container">
+            <div class="range-track"></div>
+            <div class="range-selected" id="rangeSelected"></div>
+            <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
+            <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
+          </div>
+          <div class="playback-controls">
+            <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
+            <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
+            <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
+            <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Controls</div>
+        <button id="refreshBtn" class="btn btn-primary">
+          <span id="refreshBtnText">🔄 Refresh</span>
+        </button>
+        <div class="progress-container" id="progressContainer" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="progress-text" id="progressText">Loading...</div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Overlay Opacity</div>
+        <div class="opacity-control">
+          <input type="range" id="opacitySlider" min="0" max="100" value="70">
+          <span class="opacity-value" id="opacityValue">70%</span>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Hydrology Layers</div>
+        <label class="layer-toggle">
+          <input type="checkbox" id="basinsToggle" checked>
+          <span class="toggle-label">📍 Drainage Basins</span>
+        </label>
+        <label class="layer-toggle">
+          <input type="checkbox" id="streamsToggle">
+          <span class="toggle-label">🌊 Streams</span>
+        </label>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Statistics</div>
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-value" id="totalImages">140</div>
+            <div class="stat-label">Images</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="loadedImages">0</div>
+            <div class="stat-label">Loaded</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="maxRainfall">0</div>
+            <div class="stat-label">Max mm</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="overlaps">0</div>
+            <div class="stat-label">Overlaps</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Accumulated Rainfall (mm)</div>
+        <div class="legend" id="legend"></div>
+      </div>
+      
+      <div class="panel log-panel">
+        <div class="panel-title">Activity Log</div>
+        <div class="log-content" id="logContent"></div>
+      </div>
+      
+      <footer class="app-footer">
+        <p>Open source project under <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a></p>
+        <p class="disclaimer">Provided "as is" without warranty. Use at your own risk. Radar data © <a href="https://ims.gov.il" target="_blank">Israel Meteorological Service (IMS)</a>.</p>
+      </footer>
+    </div>
+  </div>
+  
+  <!-- Hidden canvas for image processing -->
+  <canvas id="processingCanvas"></canvas>
+
+  <!-- Leaflet JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  
+  
+  <script>
+    // ============================================================
+    // IMS RADAR IMAGE DATA - Generated from timestamps (30 days)
+    // ============================================================
+    let radarData = {
+      images: []
+    };
+    
+    // IMS Radar image URL pattern
+    // https://ims.gov.il/sites/default/files/ims_data/map_images/IMSRadar4GIS/IMSRadar4GIS_YYYYMMDDHHMM_0.png
+    const IMS_RADAR_BASE = 'https://ims.gov.il/sites/default/files/ims_data/map_images/IMSRadar4GIS/';
+    
+    // Geographic bounds for the IMS radar image overlay (Israel region)
+    const RADAR_BOUNDS = [[
+        29.43,
+        31.9
+    ], [
+        34.49894896665839,
+        37.726759765625
+    ]];
+
+    // ============================================================
+    // IMS RAINFALL INTENSITY COLOR TABLE (mm/hour) - from IMS legend
+    // ============================================================
+    const radarColors = [
+      { intensity: 400,  r: 45,  g: 0,   b: 30,  accumulated: 100 },  // Near black-purple
+      { intensity: 300,  r: 75,  g: 10,  b: 45,  accumulated: 75  },  // Very dark maroon
+      { intensity: 200,  r: 255, g: 0,   b: 255, accumulated: 50 },  // Dark purple
+      { intensity: 100,  r: 208, g: 0,   b: 120, accumulated: 25 },  // Magenta
+      { intensity: 50,   r: 226, g: 11,  b: 18,  accumulated: 12 },  // Red
+      { intensity: 40,   r: 251, g: 63,  b: 2,  accumulated: 10 },  // Orange-red
+      { intensity: 30,   r: 252, g: 126, b: 16,  accumulated: 7.5  },  // Orange
+      { intensity: 24,   r: 245, g: 172, b: 0,  accumulated: 6  },  // Yellow-orange
+      { intensity: 18,   r: 255, g: 207, b: 0,  accumulated: 4.5  },  // Yellow
+      { intensity: 13,   r: 254, g: 252, b: 22,  accumulated: 3  },  // Yellow-green
+      { intensity: 9,    r: 124, g: 255, b: 33,  accumulated: 2.2  },  // Green
+      { intensity: 6,    r: 0,  g: 242, b: 33, accumulated: 1.5  },  // Teal
+      { intensity: 4,    r: 0,  g: 212, b: 28, accumulated: 1  },  // Cyan
+      { intensity: 2,  r: 0,  g: 176, b: 43, accumulated: 0.5   },  // Blue
+      { intensity: 1.2,  r: 0, g: 142, b: 74, accumulated: 0.3 },  // Lavender (0.7 per IMS)
+      { intensity: 0.7,  r: 30, g: 159, b: 154, accumulated: 0.175 },  // Light lavender (0.2 per IMS)
+      { intensity: 0.2,  r: 12, g: 195, b: 201, accumulated: 0.05},  // Very light
+      { intensity: 0.1,  r: 0, g: 102, b: 239, accumulated: 0.025},  // blue
+    ];
+
+    // ============================================================
+    // GENERATE RADAR IMAGE LIST (30 days, every 5 minutes)
+    // ============================================================
+    function generateRadarImageList(daysBack = 30) {
+      const images = [];
+      const now = new Date();
+      const fiveMinMs = 5 * 60 * 1000;
+      const totalImages = (daysBack * 24 * 60) / 5; // Images per 5 minutes
+      
+      // Round current time down to nearest 5 minutes
+      const currentSlot = Math.floor(now.getTime() / fiveMinMs) * fiveMinMs;
+      
+      for (let i = 0; i < totalImages; i++) {
+        const timestamp = new Date(currentSlot - (i * fiveMinMs));
+        
+        // Format: YYYYMMDDHHMM
+        const year = timestamp.getFullYear();
+        const month = String(timestamp.getMonth() + 1).padStart(2, '0');
+        const day = String(timestamp.getDate()).padStart(2, '0');
+        const hours = String(timestamp.getHours()).padStart(2, '0');
+        const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+        
+        const dateStr = `${year}${month}${day}${hours}${minutes}`;
+        const filename = `IMSRadar4GIS_${dateStr}_0.png`;
+        
+        images.push({
+          name: filename,
+          timestamp: timestamp.getTime(),
+          dateStr: dateStr
+        });
+      }
+      
+      // Return oldest first (for consistent processing order)
+      return images.reverse();
+    }
+    
+    function loadRadarData() {
+      log('Generating radar image list (30 days)...', 'info');
+      
+      radarData.images = generateRadarImageList(30);
+      
+      log(`Generated ${radarData.images.length} image timestamps`, 'success');
+      
+      // Initialize the UI with loaded data
+      initDatePickers();
+      
+      return true;
+    }
+
+    // ============================================================
+    // INITIALIZE MAP
+    // ============================================================
+    const map = L.map('map', {
+      center: [31.5, 35.0], // Center of Israel
+      zoom: 8,
+      zoomControl: true
+    });
+    
+    // Base map layers
+    const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+      maxZoom: 17
+    });
+    
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+      maxZoom: 19
+    });
+    
+    // Add terrain as default
+    terrainLayer.addTo(map);
+    
+    // Layer control
+    const baseMaps = {
+      '🏔️ Terrain': terrainLayer,
+      '🛰️ Satellite': satelliteLayer
+    };
+    
+    L.control.layers(baseMaps, null, {
+      position: 'topright',
+      collapsed: false
+    }).addTo(map);
+    
+    // Radar overlay layer (will be added after processing)
+    let radarOverlay = null;
+    
+    // ============================================================
+    // HYDROLOGY LAYERS (Israel Water Authority - local files)
+    // ============================================================
+    const BASINS_URL = 'data/basins.geojson';
+    const STREAMS_URL = 'data/streams.geojson';
+    
+    let basinsLayer = L.layerGroup().addTo(map); // Basins visible by default
+    let streamsLayer = L.layerGroup();
+    let basinsLoaded = false;
+    let streamsLoaded = false;
+    
+    async function loadBasins() {
+      if (basinsLoaded) return;
+      
+      log('Loading drainage basins...', 'info');
+      
+      try {
+        const response = await fetch(BASINS_URL);
+        
+        if (!response.ok) throw new Error('Failed to fetch basins');
+        
+        const geojson = await response.json();
+        
+        L.geoJSON(geojson, {
+          style: function(feature) {
+            return {
+              color: '#6B7280',
+              weight: 3,
+              opacity: 0.9,
+              fillColor: '#6B7280',
+              fillOpacity: 0.05
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const name = feature.properties?.name || feature.properties?.Name || '';
+            if (name) {
+              layer.bindTooltip(name, {
+                permanent: false,
+                direction: 'center',
+                className: 'basin-tooltip'
+              });
+            }
+          }
+        }).addTo(basinsLayer);
+        
+        basinsLoaded = true;
+        log(`Loaded ${geojson.features?.length || 0} drainage basins`, 'success');
+        
+      } catch (error) {
+        log('Failed to load basins: ' + error.message, 'error');
+      }
+    }
+    
+    async function loadStreams() {
+      if (streamsLoaded) return;
+      
+      log('Loading streams...', 'info');
+      
+      try {
+        const response = await fetch(STREAMS_URL);
+        
+        if (!response.ok) throw new Error('Failed to fetch streams');
+        
+        const geojson = await response.json();
+        
+        L.geoJSON(geojson, {
+          style: function(feature) {
+            // Style based on stream order if available
+            const order = feature.properties?.order || feature.properties?.strahler || 1;
+            return {
+              color: '#2196F3',
+              weight: order+2,
+              opacity: 0.7
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const name = feature.properties?.name || feature.properties?.Name || '';
+            if (name) {
+              layer.bindTooltip(name, {
+                permanent: false,
+                direction: 'center',
+                className: 'river-tooltip'
+              });
+            }
+          }
+        }).addTo(streamsLayer);
+        
+        streamsLoaded = true;
+        log(`Loaded ${geojson.features?.length || 0} streams`, 'success');
+        
+      } catch (error) {
+        log('Failed to load streams: ' + error.message, 'error');
+      }
+    }
+    
+    // Load hydrology layers (called from INITIALIZE section)
+    
+    // ============================================================
+    // DOM ELEMENTS
+    // ============================================================
+    const canvas = document.getElementById('processingCanvas');
+    const ctx = canvas.getContext('2d');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const refreshBtnText = document.getElementById('refreshBtnText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const logContent = document.getElementById('logContent');
+    const opacitySlider = document.getElementById('opacitySlider');
+    const opacityValue = document.getElementById('opacityValue');
+    const rangeMin = document.getElementById('rangeMin');
+    const rangeMax = document.getElementById('rangeMax');
+    const rangeSelected = document.getElementById('rangeSelected');
+    const fromLabel = document.getElementById('fromLabel');
+    const toLabel = document.getElementById('toLabel');
+    
+    // Stats
+    let stats = {
+      totalImages: radarData.images.length,
+      loadedImages: 0,
+      maxRainfall: 0,
+      overlaps: 0
+    };
+
+    // ============================================================
+    // DATE/TIME PARSING AND FILTERING
+    // ============================================================
+    // Parse Hebrew datetime string like "יום רביעי 08:30 10/12/2025"
+    function parseHebrewDateTime(hebrewStr) {
+      // Extract time and date using regex
+      const match = hebrewStr.match(/(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return null;
+      
+      const [, hours, minutes, day, month, year] = match;
+      return new Date(year, month - 1, day, hours, minutes);
+    }
+    
+    // Parse images and add Date objects
+    function parseImageDates() {
+      // For IMS images, we already have timestamps from generation
+      for (const img of radarData.images) {
+        img.date = new Date(img.timestamp);
+      }
+    }
+    
+    // Format date for display
+    function formatDateDisplay(date) {
+      if (!date) return '--:--';
+      const pad = n => n.toString().padStart(2, '0');
+      return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    
+    // Get filtered images based on slider range
+    function getFilteredImages() {
+      const minIdx = parseInt(rangeMin.value);
+      const maxIdx = parseInt(rangeMax.value);
+      return radarData.images.slice(minIdx, maxIdx + 1);
+    }
+    
+    // Update range slider visual and labels
+    function updateRangeSlider() {
+      const minVal = parseInt(rangeMin.value);
+      const maxVal = parseInt(rangeMax.value);
+      const total = radarData.images.length - 1;
+      
+      // Ensure min doesn't exceed max
+      if (minVal > maxVal) {
+        rangeMin.value = maxVal;
+      }
+      
+      const minPercent = (Math.min(minVal, maxVal) / total) * 100;
+      const maxPercent = (Math.max(minVal, maxVal) / total) * 100;
+      
+      rangeSelected.style.left = minPercent + '%';
+      rangeSelected.style.width = (maxPercent - minPercent) + '%';
+      
+      // Update labels
+      const fromImg = radarData.images[Math.min(minVal, maxVal)];
+      const toImg = radarData.images[Math.max(minVal, maxVal)];
+      
+      fromLabel.textContent = formatDateDisplay(fromImg?.date);
+      toLabel.textContent = formatDateDisplay(toImg?.date);
+      
+      // Update count in stats
+      const count = Math.abs(maxVal - minVal) + 1;
+      document.getElementById('totalImages').textContent = count;
+    }
+    
+    // Initialize range slider
+    function initDatePickers() {
+      if (radarData.images.length === 0) {
+        fromLabel.textContent = '--:--';
+        toLabel.textContent = '--:--';
+        return;
+      }
+      
+      parseImageDates();
+      
+      const maxIdx = radarData.images.length - 1;
+      rangeMin.max = maxIdx;
+      rangeMax.max = maxIdx;
+      rangeMin.value = 0;
+      rangeMax.value = maxIdx;
+      
+      updateRangeSlider();
+    }
+
+    // ============================================================
+    // COLOR FUNCTIONS
+    // ============================================================
+    function colorDistance(r1, g1, b1, r2, g2, b2) {
+      return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+    }
+
+    function rgbToIntensity(r, g, b) {
+      let bestMatch = radarColors[radarColors.length - 1];
+      let bestDistance = Infinity;
+      
+      for (const color of radarColors) {
+        const dist = colorDistance(r, g, b, color.r, color.g, color.b);
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          bestMatch = color;
+        }
+      }
+      
+      return bestMatch.intensity;
+    }
+
+    function accumulatedAmountToRgb(accumulatedAmount) {
+      if (accumulatedAmount >= radarColors[0].accumulated) {
+        return { r: radarColors[0].r, g: radarColors[0].g, b: radarColors[0].b };
+      }
+      
+      for (let i = 0; i < radarColors.length - 1; i++) {
+        if (accumulatedAmount >= radarColors[i + 1].accumulated) {
+          const lower = radarColors[i + 1];
+          const upper = radarColors[i];
+          const range = upper.accumulated - lower.accumulated;
+          const t = (accumulatedAmount - lower.accumulated) / range;
+          
+          return {
+            r: Math.round(lower.r + (upper.r - lower.r) * t),
+            g: Math.round(lower.g + (upper.g - lower.g) * t),
+            b: Math.round(lower.b + (upper.b - lower.b) * t)
+          };
+        }
+      }
+      
+      return { 
+        r: radarColors[radarColors.length - 1].r, 
+        g: radarColors[radarColors.length - 1].g, 
+        b: radarColors[radarColors.length - 1].b 
+      };
+    }
+
+    function isPixelClear(r, g, b, a) {
+      if (a < 10) return true;
+      if (r > 240 && g > 240 && b > 240) return true;
+      return false;
+    }
+
+    function isPixelColored(r, g, b, a) {
+      return !isPixelClear(r, g, b, a);
+    }
+
+    // ============================================================
+    // UI FUNCTIONS
+    // ============================================================
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(entry);
+      logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    function updateStats() {
+      document.getElementById('totalImages').textContent = stats.totalImages;
+      document.getElementById('loadedImages').textContent = stats.loadedImages;
+      document.getElementById('maxRainfall').textContent = stats.maxRainfall.toFixed(1);
+      document.getElementById('overlaps').textContent = stats.overlaps.toLocaleString();
+    }
+
+    function buildLegend() {
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '';
+      
+      // Show all radar colors from the table
+      for (const item of radarColors) {
+        const div = document.createElement('div');
+        div.className = 'legend-item';
+        div.innerHTML = `
+          <div class="legend-color" style="background: rgb(${item.r}, ${item.g}, ${item.b})"></div>
+          <span class="legend-label">${item.accumulated} mm</span>
+        `;
+        legend.appendChild(div);
+      }
+    }
+
+    // ============================================================
+    // IMAGE LOADING
+    // ============================================================
+    async function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          const directImg = new Image();
+          directImg.crossOrigin = 'anonymous';
+          directImg.onload = () => resolve(directImg);
+          directImg.onerror = () => reject(new Error(`Failed to load: ${url}`));
+          directImg.src = url;
+        };
+        img.src = proxyUrl;
+      });
+    }
+
+    // ============================================================
+    // MAIN PROCESSING
+    // ============================================================
+    let isProcessing = false;
+    
+    async function processImages() {
+      if (isProcessing) return; // Prevent concurrent processing
+      if (radarData.images.length === 0) return; // No data yet
+      
+      isProcessing = true;
+      progressContainer.style.display = 'block';
+      
+      // Get filtered images based on date range
+      const filteredImages = getFilteredImages();
+      
+      if (filteredImages.length === 0) {
+        log('No images in selected time range.', 'error');
+        progressContainer.style.display = 'none';
+        isProcessing = false;
+        return;
+      }
+      
+      stats = {
+        totalImages: filteredImages.length,
+        loadedImages: 0,
+        maxRainfall: 0,
+        overlaps: 0
+      };
+      updateStats();
+      
+      log(`Processing ${filteredImages.length} images from selected time range...`, 'info');
+      
+      const images = [];
+      const imageUrls = filteredImages.map(img => IMS_RADAR_BASE + img.name);
+      
+      // Load all images
+      for (let i = 0; i < imageUrls.length; i++) {
+        const url = imageUrls[i];
+        const imageName = filteredImages[i].name;
+        
+        try {
+          const img = await loadImage(url);
+          images.push(img);
+          stats.loadedImages++;
+          
+          const progress = ((i + 1) / imageUrls.length) * 100;
+          progressFill.style.width = `${progress}%`;
+          progressText.textContent = `Loading ${i + 1}/${imageUrls.length}`;
+          
+        } catch (error) {
+          log(`Failed: ${imageName}`, 'error');
+        }
+        
+        updateStats();
+      }
+      
+      if (images.length === 0) {
+        log('No images loaded. Check CORS proxy.', 'error');
+        isProcessing = false;
+        return;
+      }
+      
+      log(`Accumulating rainfall from ${images.length} images...`, 'info');
+      progressText.textContent = 'Accumulating rainfall...';
+      
+      // Set canvas size based on first image
+      const width = images[0].width;
+      const height = images[0].height;
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Create intensity accumulation matrix
+      const accumulatedMatrix = new Float32Array(width * height);
+      const hitCount = new Uint16Array(width * height);
+      
+      // Create temp canvas
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      // Process each image
+      for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
+        const img = images[imgIdx];
+        
+        tempCtx.clearRect(0, 0, width, height);
+        tempCtx.drawImage(img, 0, 0);
+        
+        const imgData = tempCtx.getImageData(0, 0, width, height);
+        
+        for (let i = 0; i < imgData.data.length; i += 4) {
+          const r = imgData.data[i];
+          const g = imgData.data[i + 1];
+          const b = imgData.data[i + 2];
+          const a = imgData.data[i + 3];
+          
+          const pixelIndex = i / 4;
+          
+          if (isPixelColored(r, g, b, a)) {
+            const intensity = rgbToIntensity(r, g, b);
+            accumulatedMatrix[pixelIndex] += intensity / 12 // convert mm/5min to mm amount;
+            hitCount[pixelIndex]++;
+          }
+        }
+        
+        const progress = ((imgIdx + 1) / images.length) * 100;
+        progressFill.style.width = `${progress}%`;
+        progressText.textContent = `Processing ${imgIdx + 1}/${images.length}`;
+      }
+      
+      log('Rendering final image...', 'info');
+      progressText.textContent = 'Rendering...';
+      
+      // Create result image
+      const resultData = ctx.createImageData(width, height);
+      
+      for (let pixelIndex = 0; pixelIndex < accumulatedMatrix.length; pixelIndex++) {
+        const i = pixelIndex * 4;
+        const accumulatedAmount = accumulatedMatrix[pixelIndex];
+        const hits = hitCount[pixelIndex];
+        
+        if (accumulatedAmount > 0) {
+          const color = accumulatedAmountToRgb(accumulatedAmount);
+          
+          resultData.data[i] = color.r;
+          resultData.data[i + 1] = color.g;
+          resultData.data[i + 2] = color.b;
+          resultData.data[i + 3] = 255;
+          
+          if (accumulatedAmount > stats.maxRainfall) {
+            stats.maxRainfall = accumulatedAmount;
+          }
+          
+          if (hits > 1) {
+            stats.overlaps += hits - 1;
+          }
+        }
+      }
+      
+      ctx.putImageData(resultData, 0, 0);
+      
+      // Create image URL from canvas
+      const imageDataUrl = canvas.toDataURL('image/png');
+      
+      // Remove existing overlay if any
+      if (radarOverlay) {
+        map.removeLayer(radarOverlay);
+      }
+      
+      // Add overlay to map
+      radarOverlay = L.imageOverlay(imageDataUrl, RADAR_BOUNDS, {
+        opacity: opacitySlider.value / 100,
+        interactive: false
+      }).addTo(map);
+      
+      // Fit map to radar bounds
+      // map.fitBounds(RADAR_BOUNDS);
+      
+      updateStats();
+      log(`Done! Max rainfall: ${stats.maxRainfall.toFixed(1)} mm`, 'success');
+      log(`${stats.overlaps.toLocaleString()} pixel overlaps detected`, 'success');
+      
+      progressText.textContent = 'Complete!';
+      isProcessing = false;
+    }
+
+    // ============================================================
+    // DEBOUNCED PROCESSING (for slider changes)
+    // ============================================================
+    let processTimeout = null;
+    
+    function debouncedProcess() {
+      if (processTimeout) clearTimeout(processTimeout);
+      processTimeout = setTimeout(() => {
+        processImages();
+      }, 500); // Wait 500ms after last slider change
+    }
+
+    // ============================================================
+    // REFRESH DATA FROM API
+    // ============================================================
+    function refreshData() {
+      refreshBtn.disabled = true;
+      refreshBtnText.innerHTML = '<span class="spinner"></span> Refreshing...';
+      
+      // Regenerate image list with current time
+      loadRadarData();
+      
+      // Reset to 1 day preset
+      clearPresetButtons();
+      document.querySelector('.preset-btn[data-days="1"]').classList.add('active');
+      setTimePreset(1);
+      
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh';
+      
+      processImages();
+    }
+
+    // ============================================================
+    // EVENT LISTENERS
+    // ============================================================
+    refreshBtn.addEventListener('click', refreshData);
+    
+    // Hydrology layer toggles
+    const streamsToggle = document.getElementById('streamsToggle');
+    const basinsToggle = document.getElementById('basinsToggle');
+    
+    streamsToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        streamsLayer.addTo(map);
+        if (!streamsLoaded) loadStreams(); // Lazy load streams
+      } else {
+        map.removeLayer(streamsLayer);
+      }
+    });
+    
+    basinsToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        basinsLayer.addTo(map);
+      } else {
+        map.removeLayer(basinsLayer);
+      }
+    });
+    
+    opacitySlider.addEventListener('input', (e) => {
+      const value = e.target.value;
+      opacityValue.textContent = `${value}%`;
+      
+      if (radarOverlay) {
+        radarOverlay.setOpacity(value / 100);
+      }
+    });
+    
+    // Range slider listeners - trigger debounced processing on change
+    rangeMin.addEventListener('input', () => {
+      updateRangeSlider();
+      clearPresetButtons();
+      debouncedProcess();
+    });
+    rangeMax.addEventListener('input', () => {
+      updateRangeSlider();
+      clearPresetButtons();
+      debouncedProcess();
+    });
+    
+    // ============================================================
+    // PRESET BUTTONS (1d, 7d, 14d, 30d)
+    // ============================================================
+    const presetButtons = document.querySelectorAll('.preset-btn');
+    
+    function clearPresetButtons() {
+      presetButtons.forEach(btn => btn.classList.remove('active'));
+    }
+    
+    function setTimePreset(days) {
+      if (radarData.images.length === 0) return;
+      
+      // Calculate how many images correspond to the days
+      // Images are every 5 minutes, so 288 images per day
+      const imagesPerDay = 288;
+      const totalImages = radarData.images.length;
+      const imagesNeeded = days * imagesPerDay;
+      
+      // Set range to show last N days (most recent images)
+      const fromIndex = Math.max(0, totalImages - imagesNeeded);
+      const toIndex = totalImages - 1;
+      
+      rangeMin.value = fromIndex;
+      rangeMax.value = toIndex;
+      updateRangeSlider();
+      debouncedProcess();
+    }
+    
+    presetButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearPresetButtons();
+        btn.classList.add('active');
+        const days = parseInt(btn.dataset.days);
+        setTimePreset(days);
+      });
+    });
+    
+    // ============================================================
+    // HOUR-BY-HOUR PLAYBACK
+    // ============================================================
+    const prevHourBtn = document.getElementById('prevHourBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const nextHourBtn = document.getElementById('nextHourBtn');
+    const playbackLabel = document.getElementById('playbackLabel');
+    
+    let isPlaying = false;
+    let playbackInterval = null;
+    let currentHourOffset = 0; // Hours from the end (0 = most recent hour)
+    
+    function getHourRange() {
+      // Returns {fromIndex, toIndex} for a 1-hour window at currentHourOffset from end
+      if (radarData.images.length === 0) return { fromIndex: 0, toIndex: 0 };
+      
+      const imagesPerHour = 12;
+      const totalImages = radarData.images.length;
+      const totalHours = Math.ceil(totalImages / imagesPerHour);
+      
+      // Clamp offset
+      currentHourOffset = Math.max(0, Math.min(currentHourOffset, totalHours - 1));
+      
+      // Calculate indices for this hour
+      const toIndex = totalImages - 1 - (currentHourOffset * imagesPerHour);
+      const fromIndex = Math.max(0, toIndex - imagesPerHour + 1);
+      
+      return { fromIndex: Math.max(0, fromIndex), toIndex: Math.max(0, toIndex) };
+    }
+    
+    function showHour(offset) {
+      currentHourOffset = offset;
+      const { fromIndex, toIndex } = getHourRange();
+      
+      rangeMin.value = fromIndex;
+      rangeMax.value = toIndex;
+      updateRangeSlider();
+      clearPresetButtons();
+      
+      // Update label
+      if (currentHourOffset === 0) {
+        playbackLabel.textContent = 'Current hour';
+      } else {
+        playbackLabel.textContent = `${currentHourOffset}h ago`;
+      }
+      
+      processImages();
+    }
+    
+    function prevHour() {
+      const imagesPerHour = 12;
+      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      if (currentHourOffset < totalHours - 1) {
+        showHour(currentHourOffset + 1);
+      }
+    }
+    
+    function nextHour() {
+      if (currentHourOffset > 0) {
+        showHour(currentHourOffset - 1);
+      }
+    }
+    
+    function togglePlayback() {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        startPlayback();
+      }
+    }
+    
+    function startPlayback() {
+      isPlaying = true;
+      playPauseBtn.textContent = '⏸';
+      playPauseBtn.classList.add('playing');
+      
+      // Start from oldest hour
+      const imagesPerHour = 12;
+      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      currentHourOffset = totalHours - 1;
+      showHour(currentHourOffset);
+      
+      // Advance every 2 seconds
+      playbackInterval = setInterval(() => {
+        if (currentHourOffset > 0) {
+          nextHour();
+        } else {
+          stopPlayback();
+        }
+      }, 2000);
+    }
+    
+    function stopPlayback() {
+      isPlaying = false;
+      playPauseBtn.textContent = '▶';
+      playPauseBtn.classList.remove('playing');
+      
+      if (playbackInterval) {
+        clearInterval(playbackInterval);
+        playbackInterval = null;
+      }
+    }
+    
+    prevHourBtn.addEventListener('click', () => {
+      stopPlayback();
+      prevHour();
+    });
+    
+    nextHourBtn.addEventListener('click', () => {
+      stopPlayback();
+      nextHour();
+    });
+    
+    playPauseBtn.addEventListener('click', togglePlayback);
+
+    // ============================================================
+    // INITIALIZE
+    // ============================================================
+    buildLegend();
+    
+    // Load basins layer (streams loaded on demand)
+    loadBasins();
+    
+    // Generate radar image list (synchronous)
+    loadRadarData();
+    
+    // Set default to 1 day
+    setTimePreset(1);
+    
+    // Auto-process on load
+    log('Auto-processing last 24 hours...', 'info');
+    processImages();
+  </script>
+</body>
+</html>
