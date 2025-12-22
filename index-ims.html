@@ -1454,6 +1454,10 @@
       isProcessing = true;
       progressContainer.style.display = 'block';
       
+      // Disable refresh button during processing
+      refreshBtn.disabled = true;
+      refreshBtnText.innerHTML = '<span class="spinner"></span> Processing...';
+      
       // Get filtered images based on date range
       const filteredImages = getFilteredImages();
       
@@ -1461,6 +1465,8 @@
         log('No images in selected time range.', 'error');
         progressContainer.style.display = 'none';
         isProcessing = false;
+        refreshBtn.disabled = false;
+        refreshBtnText.textContent = '🔄 Refresh';
         return;
       }
       
@@ -1482,6 +1488,7 @@
         if (abortProcessing || thisProcessingId !== currentProcessingId) {
           log('Processing cancelled - new time range selected', 'info');
           isProcessing = false;
+          // Don't re-enable button here as new processing will take over
           return;
         }
         
@@ -1514,11 +1521,15 @@
       if (images.length === 0) {
         log('No images loaded. Check CORS proxy or try different dates.', 'error');
         isProcessing = false;
+        refreshBtn.disabled = false;
+        refreshBtnText.textContent = '🔄 Refresh';
         return;
       }
       
       log(`Accumulating rainfall from ${images.length} images...`, 'info');
       progressText.textContent = 'Accumulating rainfall...';
+      progressFill.style.width = '0%';
+      refreshBtnText.innerHTML = '<span class="spinner"></span> Accumulating...';
       
       // Set canvas size based on first image
       const width = images[0].width;
@@ -1539,6 +1550,16 @@
       // Process each image
       for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
         const img = images[imgIdx];
+        
+        // Update progress for accumulation phase
+        const accProgress = ((imgIdx + 1) / images.length) * 100;
+        progressFill.style.width = `${accProgress}%`;
+        progressText.textContent = `Accumulating ${imgIdx + 1}/${images.length}`;
+        
+        // Yield to UI every 50 images
+        if (imgIdx % 50 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
         
         tempCtx.clearRect(0, 0, width, height);
         tempCtx.drawImage(img, 0, 0);
@@ -1567,6 +1588,7 @@
       
       log('Rendering final image...', 'info');
       progressText.textContent = 'Rendering...';
+      refreshBtnText.innerHTML = '<span class="spinner"></span> Rendering...';
       
       // Create result image
       const resultData = ctx.createImageData(width, height);
@@ -1619,6 +1641,10 @@
       
       progressText.textContent = 'Complete!';
       isProcessing = false;
+      
+      // Re-enable refresh button
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh';
     }
 
     // ============================================================
