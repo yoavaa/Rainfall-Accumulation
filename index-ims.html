@@ -831,10 +831,10 @@
     // Format Date to API timestamp format (YYYYMMDDHHMM)
     function formatTimestamp(date) {
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-``      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
       return `${year}${month}${day}${hours}${minutes}`;
     }
     
@@ -867,10 +867,29 @@
       return await response.json();
     }
     
+    // Estimate how many images need to be imported based on time difference
+    function estimateImagesToImport(lastImageTs) {
+      const now = getCurrentTimeSlot();
+      const lastImageDate = parseTimestamp(lastImageTs);
+      const diffMs = now.getTime() - lastImageDate.getTime();
+      const fiveMinMs = 5 * 60 * 1000;
+      // Estimate number of 5-minute slots, minimum 1
+      return Math.max(1, Math.floor(diffMs / fiveMinMs));
+    }
+    
     // Update images to be current - call import_next_image until up to date
     async function updateToLatest() {
       log('Checking for new images to import...', 'info');
       let imported = 0;
+      
+      // Estimate how many images we need to import
+      const estimatedTotal = estimateImagesToImport(radarData.timeRange.end);
+      log(`Estimated ${estimatedTotal} images to import`, 'info');
+      
+      // Show progress container
+      progressContainer.style.display = 'block';
+      progressText.textContent = `Checking for ~${estimatedTotal} new images...`;
+      progressFill.style.width = '0%';
       
       while (true) {
         try {
@@ -879,15 +898,22 @@
           if (result.status === 'no-image-to-import') {
             if (imported > 0) {
               log(`Imported ${imported} new images`, 'success');
+              progressText.textContent = `Imported ${imported} new images`;
             } else {
               log('Already up to date', 'success');
+              progressText.textContent = 'Already up to date';
             }
+            progressFill.style.width = '100%';
             break;
           }
           
           if (result.status === 'ok') {
             imported++;
             log(`Imported image: ${result._id}`, 'info');
+            // Calculate progress based on estimate
+            const progress = Math.min(95, (imported / estimatedTotal) * 100);
+            progressText.textContent = `Importing images... ${imported}/${estimatedTotal}`;
+            progressFill.style.width = `${progress}%`;
             // Update the end time in our time range
             radarData.timeRange.end = result._id;
           } else {
@@ -896,6 +922,7 @@
           }
         } catch (error) {
           log('Error importing image: ' + error.message, 'error');
+          progressText.textContent = 'Import error';
           break;
         }
       }
@@ -907,21 +934,28 @@
     async function loadRadarData() {
       log('Fetching radar data from API...', 'info');
       
+      // Show progress
+      progressContainer.style.display = 'block';
+      progressText.textContent = 'Connecting to API...';
+      progressFill.style.width = '10%';
+      
       try {
         // Step 1: Get time range
+        progressText.textContent = 'Fetching time range...';
         const timeRange = await fetchTimeRange();
         radarData.timeRange = timeRange;
         log(`Data available from ${timeRange.start} to ${timeRange.end}`, 'success');
+        progressFill.style.width = '20%';
         
-        // Step 2: Import new images in background (don't block main load)
-        const updatePromise = updateToLatest();
+        // Step 2: Import new images (shows its own progress)
+        await updateToLatest();
         
         // Step 3: Calculate time range for last 24 hours
         const now = getCurrentTimeSlot();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         
         // Use the latest available data, bounded by what's in the API
-        const endTs = timeRange.end;
+        const endTs = radarData.timeRange.end; // Use updated end time after imports
         const endDate = parseTimestamp(endTs);
         
         // Start from 24 hours before end, or from start of available data
@@ -932,6 +966,8 @@
         const startTs = formatTimestamp(startDate);
         
         log(`Loading images from ${startTs} to ${endTs}...`, 'info');
+        progressText.textContent = 'Loading image list...';
+        progressFill.style.width = '50%';
         
         // Step 4: Fetch images for the time range
         const images = await fetchImagesForRange(startTs, endTs);
@@ -948,9 +984,8 @@
           }));
         
         log(`Loaded ${radarData.images.length} images`, 'success');
-        
-        // Wait for update to complete
-        await updatePromise;
+        progressText.textContent = `Loaded ${radarData.images.length} images`;
+        progressFill.style.width = '100%';
         
         // Initialize UI with loaded data
         initDatePickers();
@@ -958,6 +993,7 @@
         return true;
       } catch (error) {
         log('Failed to load radar data: ' + error.message, 'error');
+        progressText.textContent = 'Failed to load data';
         return false;
       }
     }
