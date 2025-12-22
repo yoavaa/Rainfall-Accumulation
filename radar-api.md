@@ -70,6 +70,13 @@ or, if the end time is up to date
 {"status":"no-image-to-import","_id":"202512192320",}
 ```
 
+## get import prior image
+
+The api triggers the import of the image before the first
+```
+https://yoav68.wixstudio.com/radar/_functions/import_prior_image
+```
+
 
 
 

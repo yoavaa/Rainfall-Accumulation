@@ -658,13 +658,30 @@
       </div>
       
       <div class="panel">
+        <div class="panel-title">Available Data</div>
+        <div class="time-labels" style="margin-bottom: 0;">
+          <div class="time-label-box">
+            <div class="time-label-title">Earliest</div>
+            <div class="time-label-value" id="apiStartLabel">--:--</div>
+          </div>
+          <div class="time-label-box">
+            <div class="time-label-title">Latest</div>
+            <div class="time-label-value" id="apiEndLabel">--:--</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel">
         <div class="panel-title">Time Range</div>
         <div class="time-range-container">
           <div class="preset-buttons">
-            <button class="preset-btn active" data-days="1">1d</button>
-            <button class="preset-btn" data-days="7">7d</button>
-            <button class="preset-btn" data-days="14">14d</button>
-            <button class="preset-btn" data-days="30">30d</button>
+            <button class="preset-btn" data-hours="3">3h</button>
+            <button class="preset-btn" data-hours="6">6h</button>
+            <button class="preset-btn" data-hours="12">12h</button>
+            <button class="preset-btn active" data-hours="24">1d</button>
+            <button class="preset-btn" data-hours="168">7d</button>
+            <button class="preset-btn" data-hours="336">14d</button>
+            <button class="preset-btn" data-hours="720">30d</button>
           </div>
           <div class="time-labels">
             <div class="time-label-box">
@@ -705,14 +722,6 @@
       </div>
       
       <div class="panel">
-        <div class="panel-title">Overlay Opacity</div>
-        <div class="opacity-control">
-          <input type="range" id="opacitySlider" min="0" max="100" value="70">
-          <span class="opacity-value" id="opacityValue">70%</span>
-        </div>
-      </div>
-      
-      <div class="panel">
         <div class="panel-title">Hydrology Layers</div>
         <label class="layer-toggle">
           <input type="checkbox" id="basinsToggle" checked>
@@ -725,30 +734,16 @@
       </div>
       
       <div class="panel">
-        <div class="panel-title">Statistics</div>
-        <div class="stats">
-          <div class="stat-item">
-            <div class="stat-value" id="totalImages">140</div>
-            <div class="stat-label">Images</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="loadedImages">0</div>
-            <div class="stat-label">Loaded</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="maxRainfall">0</div>
-            <div class="stat-label">Max mm</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="overlaps">0</div>
-            <div class="stat-label">Overlaps</div>
-          </div>
-        </div>
+        <div class="panel-title">Accumulated Rainfall (mm)</div>
+        <div class="legend" id="legend"></div>
       </div>
       
       <div class="panel">
-        <div class="panel-title">Accumulated Rainfall (mm)</div>
-        <div class="legend" id="legend"></div>
+        <div class="panel-title">Overlay Opacity</div>
+        <div class="opacity-control">
+          <input type="range" id="opacitySlider" min="0" max="100" value="70">
+          <span class="opacity-value" id="opacityValue">70%</span>
+        </div>
       </div>
       
       <div class="panel log-panel">
@@ -916,6 +911,7 @@
             progressFill.style.width = `${progress}%`;
             // Update the end time in our time range
             radarData.timeRange.end = result._id;
+            updateApiTimeRangeDisplay();
           } else {
             // Unknown status, stop
             break;
@@ -928,6 +924,19 @@
       }
       
       return imported;
+    }
+    
+    // Update API time range display in sidebar
+    function updateApiTimeRangeDisplay() {
+      const apiStartLabel = document.getElementById('apiStartLabel');
+      const apiEndLabel = document.getElementById('apiEndLabel');
+      
+      if (radarData.timeRange.start) {
+        apiStartLabel.textContent = formatDateDisplay(parseTimestamp(radarData.timeRange.start));
+      }
+      if (radarData.timeRange.end) {
+        apiEndLabel.textContent = formatDateDisplay(parseTimestamp(radarData.timeRange.end));
+      }
     }
     
     // Main function to load radar data from API
@@ -944,6 +953,7 @@
         progressText.textContent = 'Fetching time range...';
         const timeRange = await fetchTimeRange();
         radarData.timeRange = timeRange;
+        updateApiTimeRangeDisplay();
         log(`Data available from ${timeRange.start} to ${timeRange.end}`, 'success');
         progressFill.style.width = '20%';
         
@@ -988,9 +998,9 @@
         progressFill.style.width = '100%';
         
         // Initialize UI with loaded data
-        initDatePickers();
-        
-        return true;
+      initDatePickers();
+      
+      return true;
       } catch (error) {
         log('Failed to load radar data: ' + error.message, 'error');
         progressText.textContent = 'Failed to load data';
@@ -999,28 +1009,77 @@
     }
     
     // Load images for a specific time range (used when time range changes)
+    // Handles pagination since API returns max 300 images per request
     async function loadImagesForTimeRange(fromTs, toTs) {
       try {
-        log(`Fetching images from ${fromTs} to ${toTs}...`, 'info');
+        const fromDate = parseTimestamp(fromTs);
+        const toDate = parseTimestamp(toTs);
+        const totalMs = toDate.getTime() - fromDate.getTime();
+        const fiveMinMs = 5 * 60 * 1000;
+        const estimatedImages = Math.ceil(totalMs / fiveMinMs);
         
-        const images = await fetchImagesForRange(fromTs, toTs);
+        // API returns max 300 images per request (about 25 hours)
+        const maxImagesPerRequest = 290; // Leave some margin
+        const maxMsPerRequest = maxImagesPerRequest * fiveMinMs;
         
-        radarData.images = images
-          .filter(img => img.url && img.status !== 'no-image')
-          .map(img => ({
-            _id: img._id,
-            url: img.url,
-            timestamp: parseTimestamp(img._id).getTime(),
-            dateStr: img._id,
-            date: parseTimestamp(img._id)
-          }));
+        let allImages = [];
+        let currentFrom = fromDate;
+        let requestCount = 0;
+        const totalRequests = Math.ceil(totalMs / maxMsPerRequest);
         
-        log(`Loaded ${radarData.images.length} images`, 'success');
+        progressContainer.style.display = 'block';
+        
+        while (currentFrom.getTime() < toDate.getTime()) {
+          const currentTo = new Date(Math.min(
+            currentFrom.getTime() + maxMsPerRequest,
+            toDate.getTime()
+          ));
+          
+          const currentFromTs = formatTimestamp(currentFrom);
+          const currentToTs = formatTimestamp(currentTo);
+          
+          requestCount++;
+          progressText.textContent = `Fetching images batch ${requestCount}/${totalRequests}...`;
+          progressFill.style.width = `${(requestCount / totalRequests) * 80}%`;
+          
+          log(`Fetching batch ${requestCount}: ${currentFromTs} to ${currentToTs}...`, 'info');
+          
+          const images = await fetchImagesForRange(currentFromTs, currentToTs);
+          
+          // Transform and filter images
+          const processedImages = images
+            .filter(img => img.url && img.status !== 'no-image')
+            .map(img => ({
+              _id: img._id,
+              url: img.url,
+              timestamp: parseTimestamp(img._id).getTime(),
+              dateStr: img._id,
+              date: parseTimestamp(img._id)
+            }));
+          
+          allImages = allImages.concat(processedImages);
+          
+          // Move to next batch (add 5 min to avoid duplicate at boundary)
+          currentFrom = new Date(currentTo.getTime() + fiveMinMs);
+        }
+        
+        // Remove any duplicates (by _id) and sort by timestamp
+        const uniqueMap = new Map();
+        for (const img of allImages) {
+          uniqueMap.set(img._id, img);
+        }
+        radarData.images = Array.from(uniqueMap.values())
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        progressText.textContent = `Loaded ${radarData.images.length} images`;
+        progressFill.style.width = '100%';
+        log(`Loaded ${radarData.images.length} images total`, 'success');
         
         initDatePickers();
         return true;
       } catch (error) {
         log('Failed to load images: ' + error.message, 'error');
+        progressText.textContent = 'Failed to load images';
         return false;
       }
     }
@@ -1244,10 +1303,6 @@
       
       fromLabel.textContent = formatDateDisplay(fromImg?.date);
       toLabel.textContent = formatDateDisplay(toImg?.date);
-      
-      // Update count in stats
-      const count = Math.abs(maxVal - minVal) + 1;
-      document.getElementById('totalImages').textContent = count;
     }
     
     // Initialize range slider
@@ -1340,10 +1395,8 @@
     }
 
     function updateStats() {
-      document.getElementById('totalImages').textContent = stats.totalImages;
-      document.getElementById('loadedImages').textContent = stats.loadedImages;
-      document.getElementById('maxRainfall').textContent = stats.maxRainfall.toFixed(1);
-      document.getElementById('overlaps').textContent = stats.overlaps.toLocaleString();
+      // Stats are tracked internally but not displayed (panel removed)
+      // Could be used for logging or other purposes
     }
 
     function buildLegend() {
@@ -1614,8 +1667,8 @@
       } catch (error) {
         log('Refresh failed: ' + error.message, 'error');
       } finally {
-        refreshBtn.disabled = false;
-        refreshBtnText.textContent = '🔄 Refresh';
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh';
       }
     }
 
@@ -1658,11 +1711,17 @@
     rangeMin.addEventListener('input', () => {
       updateRangeSlider();
       clearPresetButtons();
+      // Reset playback range when user manually adjusts sliders
+      playbackRangeStart = 0;
+      playbackRangeEnd = 0;
       debouncedProcess();
     });
     rangeMax.addEventListener('input', () => {
       updateRangeSlider();
       clearPresetButtons();
+      // Reset playback range when user manually adjusts sliders
+      playbackRangeStart = 0;
+      playbackRangeEnd = 0;
       debouncedProcess();
     });
     
@@ -1675,7 +1734,7 @@
       presetButtons.forEach(btn => btn.classList.remove('active'));
     }
     
-    async function setTimePreset(days) {
+    async function setTimePreset(hours) {
       if (!radarData.timeRange.end) {
         log('No time range available yet', 'error');
         return;
@@ -1683,7 +1742,7 @@
       
       // Calculate time range for the preset
       const endDate = parseTimestamp(radarData.timeRange.end);
-      const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
+      const startDate = new Date(endDate.getTime() - hours * 60 * 60 * 1000);
       
       // Clamp to available data range
       const availableStart = parseTimestamp(radarData.timeRange.start);
@@ -1708,8 +1767,8 @@
         clearPresetButtons();
         btn.classList.add('active');
         btn.disabled = true;
-        const days = parseInt(btn.dataset.days);
-        await setTimePreset(days);
+        const hours = parseInt(btn.dataset.hours);
+        await setTimePreset(hours);
         btn.disabled = false;
       });
     });
@@ -1726,46 +1785,56 @@
     let playbackInterval = null;
     let currentHourOffset = 0; // Hours from the end (0 = most recent hour)
     
-    function getHourRange() {
-      // Returns {fromIndex, toIndex} for a 1-hour window at currentHourOffset from end
-      if (radarData.images.length === 0) return { fromIndex: 0, toIndex: 0 };
+    // Store the playback range (set when play starts, based on current slider range)
+    let playbackRangeStart = 0;
+    let playbackRangeEnd = 0;
+    
+    function getPlaybackHourRange() {
+      // Returns {fromIndex, toIndex} for a 1-hour window at currentHourOffset within playback range
+      const rangeSize = playbackRangeEnd - playbackRangeStart + 1;
+      if (rangeSize <= 0) return { fromIndex: 0, toIndex: 0 };
       
       const imagesPerHour = 12;
-      const totalImages = radarData.images.length;
-      const totalHours = Math.ceil(totalImages / imagesPerHour);
+      const totalHours = Math.ceil(rangeSize / imagesPerHour);
       
       // Clamp offset
       currentHourOffset = Math.max(0, Math.min(currentHourOffset, totalHours - 1));
       
-      // Calculate indices for this hour
-      const toIndex = totalImages - 1 - (currentHourOffset * imagesPerHour);
-      const fromIndex = Math.max(0, toIndex - imagesPerHour + 1);
+      // Calculate indices for this hour within the playback range
+      const toIndex = playbackRangeEnd - (currentHourOffset * imagesPerHour);
+      const fromIndex = Math.max(playbackRangeStart, toIndex - imagesPerHour + 1);
       
-      return { fromIndex: Math.max(0, fromIndex), toIndex: Math.max(0, toIndex) };
+      return { fromIndex: Math.max(playbackRangeStart, fromIndex), toIndex: Math.min(playbackRangeEnd, toIndex) };
     }
     
     function showHour(offset) {
       currentHourOffset = offset;
-      const { fromIndex, toIndex } = getHourRange();
+      const { fromIndex, toIndex } = getPlaybackHourRange();
       
       rangeMin.value = fromIndex;
       rangeMax.value = toIndex;
       updateRangeSlider();
       clearPresetButtons();
       
+      // Calculate total hours in playback range
+      const rangeSize = playbackRangeEnd - playbackRangeStart + 1;
+      const imagesPerHour = 12;
+      const totalHours = Math.ceil(rangeSize / imagesPerHour);
+      
       // Update label
       if (currentHourOffset === 0) {
-        playbackLabel.textContent = 'Current hour';
+        playbackLabel.textContent = `Hour ${totalHours}/${totalHours}`;
       } else {
-        playbackLabel.textContent = `${currentHourOffset}h ago`;
+        playbackLabel.textContent = `Hour ${totalHours - currentHourOffset}/${totalHours}`;
       }
       
       processImages();
     }
     
     function prevHour() {
+      const rangeSize = playbackRangeEnd - playbackRangeStart + 1;
       const imagesPerHour = 12;
-      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      const totalHours = Math.ceil(rangeSize / imagesPerHour);
       if (currentHourOffset < totalHours - 1) {
         showHour(currentHourOffset + 1);
       }
@@ -1790,9 +1859,21 @@
       playPauseBtn.textContent = '⏸';
       playPauseBtn.classList.add('playing');
       
-      // Start from oldest hour
+      // Store the current slider range as playback range
+      playbackRangeStart = parseInt(rangeMin.value);
+      playbackRangeEnd = parseInt(rangeMax.value);
+      
+      // Ensure start <= end
+      if (playbackRangeStart > playbackRangeEnd) {
+        [playbackRangeStart, playbackRangeEnd] = [playbackRangeEnd, playbackRangeStart];
+      }
+      
+      // Calculate total hours in selected range
+      const rangeSize = playbackRangeEnd - playbackRangeStart + 1;
       const imagesPerHour = 12;
-      const totalHours = Math.ceil(radarData.images.length / imagesPerHour);
+      const totalHours = Math.ceil(rangeSize / imagesPerHour);
+      
+      // Start from oldest hour (highest offset)
       currentHourOffset = totalHours - 1;
       showHour(currentHourOffset);
       
@@ -1810,6 +1891,7 @@
       isPlaying = false;
       playPauseBtn.textContent = '▶';
       playPauseBtn.classList.remove('playing');
+      playbackLabel.textContent = 'Hour-by-hour';
       
       if (playbackInterval) {
         clearInterval(playbackInterval);
@@ -1819,11 +1901,29 @@
     
     prevHourBtn.addEventListener('click', () => {
       stopPlayback();
+      // Initialize playback range from current slider values if not set
+      if (playbackRangeStart === 0 && playbackRangeEnd === 0) {
+        playbackRangeStart = parseInt(rangeMin.value);
+        playbackRangeEnd = parseInt(rangeMax.value);
+        if (playbackRangeStart > playbackRangeEnd) {
+          [playbackRangeStart, playbackRangeEnd] = [playbackRangeEnd, playbackRangeStart];
+        }
+        currentHourOffset = 0; // Start from most recent hour
+      }
       prevHour();
     });
     
     nextHourBtn.addEventListener('click', () => {
       stopPlayback();
+      // Initialize playback range from current slider values if not set
+      if (playbackRangeStart === 0 && playbackRangeEnd === 0) {
+        playbackRangeStart = parseInt(rangeMin.value);
+        playbackRangeEnd = parseInt(rangeMax.value);
+        if (playbackRangeStart > playbackRangeEnd) {
+          [playbackRangeStart, playbackRangeEnd] = [playbackRangeEnd, playbackRangeStart];
+        }
+        currentHourOffset = 0;
+      }
       nextHour();
     });
     
@@ -1849,10 +1949,10 @@
         rangeMin.value = 0;
         rangeMax.value = radarData.images.length - 1;
         updateRangeSlider();
-        
-        // Auto-process on load
+    
+    // Auto-process on load
         log('Processing last 24 hours...', 'info');
-        processImages();
+    processImages();
       } else {
         log('No images available to process', 'error');
       }
