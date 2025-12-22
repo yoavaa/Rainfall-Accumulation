@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IMS Radar Rainfall Accumulation (30 Days)</title>
+  <title>IMS Radar Rainfall Accumulation</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -654,7 +654,7 @@
     <div class="sidebar">
       <div class="sidebar-header">
         <h1>☁️ IMS Rainfall Accumulation</h1>
-        <p class="subtitle">30-day historical radar data</p>
+        <p class="subtitle">Historical radar data (API-powered)</p>
       </div>
       
       <div class="panel">
@@ -772,15 +772,14 @@
   
   <script>
     // ============================================================
-    // IMS RADAR IMAGE DATA - Generated from timestamps (30 days)
+    // RADAR API CONFIGURATION
     // ============================================================
-    let radarData = {
-      images: []
-    };
+    const RADAR_API_BASE = 'https://yoav68.wixstudio.com/radar/_functions';
     
-    // IMS Radar image URL pattern
-    // https://ims.gov.il/sites/default/files/ims_data/map_images/IMSRadar4GIS/IMSRadar4GIS_YYYYMMDDHHMM_0.png
-    const IMS_RADAR_BASE = 'https://ims.gov.il/sites/default/files/ims_data/map_images/IMSRadar4GIS/';
+    let radarData = {
+      images: [],
+      timeRange: { start: null, end: null }
+    };
     
     // Geographic bounds for the IMS radar image overlay (Israel region)
     const RADAR_BOUNDS = [[
@@ -816,52 +815,178 @@
     ];
 
     // ============================================================
-    // GENERATE RADAR IMAGE LIST (30 days, every 5 minutes)
+    // RADAR API FUNCTIONS
     // ============================================================
-    function generateRadarImageList(daysBack = 30) {
-      const images = [];
-      const now = new Date();
-      const fiveMinMs = 5 * 60 * 1000;
-      const totalImages = (daysBack * 24 * 60) / 5; // Images per 5 minutes
-      
-      // Round current time down to nearest 5 minutes
-      const currentSlot = Math.floor(now.getTime() / fiveMinMs) * fiveMinMs;
-      
-      for (let i = 0; i < totalImages; i++) {
-        const timestamp = new Date(currentSlot - (i * fiveMinMs));
-        
-        // Format: YYYYMMDDHHMM
-        const year = timestamp.getFullYear();
-        const month = String(timestamp.getMonth() + 1).padStart(2, '0');
-        const day = String(timestamp.getDate()).padStart(2, '0');
-        const hours = String(timestamp.getHours()).padStart(2, '0');
-        const minutes = String(timestamp.getMinutes()).padStart(2, '0');
-        
-        const dateStr = `${year}${month}${day}${hours}${minutes}`;
-        const filename = `IMSRadar4GIS_${dateStr}_0.png`;
-        
-        images.push({
-          name: filename,
-          timestamp: timestamp.getTime(),
-          dateStr: dateStr
-        });
-      }
-      
-      // Return oldest first (for consistent processing order)
-      return images.reverse();
+    
+    // Parse API timestamp format (YYYYMMDDHHMM) to Date
+    function parseTimestamp(ts) {
+      const year = parseInt(ts.substring(0, 4));
+      const month = parseInt(ts.substring(4, 6)) - 1;
+      const day = parseInt(ts.substring(6, 8));
+      const hour = parseInt(ts.substring(8, 10));
+      const minute = parseInt(ts.substring(10, 12));
+      return new Date(year, month, day, hour, minute);
     }
     
-    function loadRadarData() {
-      log('Generating radar image list (30 days)...', 'info');
+    // Format Date to API timestamp format (YYYYMMDDHHMM)
+    function formatTimestamp(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+``      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}${month}${day}${hours}${minutes}`;
+    }
+    
+    // Get current time rounded down to nearest 5 minutes
+    function getCurrentTimeSlot() {
+      const now = new Date();
+      const fiveMinMs = 5 * 60 * 1000;
+      return new Date(Math.floor(now.getTime() / fiveMinMs) * fiveMinMs);
+    }
+    
+    // API: Get time range
+    async function fetchTimeRange() {
+      const response = await fetch(`${RADAR_API_BASE}/time_range`);
+      if (!response.ok) throw new Error('Failed to fetch time range');
+      return await response.json();
+    }
+    
+    // API: Get images for time range
+    async function fetchImagesForRange(fromTime, toTime) {
+      const url = `${RADAR_API_BASE}/images_time_range?fromTime=${fromTime}&toTime=${toTime}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch images');
+      return await response.json();
+    }
+    
+    // API: Import next image
+    async function importNextImage() {
+      const response = await fetch(`${RADAR_API_BASE}/import_next_image`);
+      if (!response.ok) throw new Error('Failed to import next image');
+      return await response.json();
+    }
+    
+    // Update images to be current - call import_next_image until up to date
+    async function updateToLatest() {
+      log('Checking for new images to import...', 'info');
+      let imported = 0;
       
-      radarData.images = generateRadarImageList(30);
+      while (true) {
+        try {
+          const result = await importNextImage();
+          
+          if (result.status === 'no-image-to-import') {
+            if (imported > 0) {
+              log(`Imported ${imported} new images`, 'success');
+            } else {
+              log('Already up to date', 'success');
+            }
+            break;
+          }
+          
+          if (result.status === 'ok') {
+            imported++;
+            log(`Imported image: ${result._id}`, 'info');
+            // Update the end time in our time range
+            radarData.timeRange.end = result._id;
+          } else {
+            // Unknown status, stop
+            break;
+          }
+        } catch (error) {
+          log('Error importing image: ' + error.message, 'error');
+          break;
+        }
+      }
       
-      log(`Generated ${radarData.images.length} image timestamps`, 'success');
+      return imported;
+    }
+    
+    // Main function to load radar data from API
+    async function loadRadarData() {
+      log('Fetching radar data from API...', 'info');
       
-      // Initialize the UI with loaded data
-      initDatePickers();
-      
-      return true;
+      try {
+        // Step 1: Get time range
+        const timeRange = await fetchTimeRange();
+        radarData.timeRange = timeRange;
+        log(`Data available from ${timeRange.start} to ${timeRange.end}`, 'success');
+        
+        // Step 2: Import new images in background (don't block main load)
+        const updatePromise = updateToLatest();
+        
+        // Step 3: Calculate time range for last 24 hours
+        const now = getCurrentTimeSlot();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        
+        // Use the latest available data, bounded by what's in the API
+        const endTs = timeRange.end;
+        const endDate = parseTimestamp(endTs);
+        
+        // Start from 24 hours before end, or from start of available data
+        const startDate = new Date(Math.max(
+          endDate.getTime() - 24 * 60 * 60 * 1000,
+          parseTimestamp(timeRange.start).getTime()
+        ));
+        const startTs = formatTimestamp(startDate);
+        
+        log(`Loading images from ${startTs} to ${endTs}...`, 'info');
+        
+        // Step 4: Fetch images for the time range
+        const images = await fetchImagesForRange(startTs, endTs);
+        
+        // Transform API response to our format
+        radarData.images = images
+          .filter(img => img.url && img.status !== 'no-image') // Skip missing images
+          .map(img => ({
+            _id: img._id,
+            url: img.url,
+            timestamp: parseTimestamp(img._id).getTime(),
+            dateStr: img._id,
+            date: parseTimestamp(img._id)
+          }));
+        
+        log(`Loaded ${radarData.images.length} images`, 'success');
+        
+        // Wait for update to complete
+        await updatePromise;
+        
+        // Initialize UI with loaded data
+        initDatePickers();
+        
+        return true;
+      } catch (error) {
+        log('Failed to load radar data: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // Load images for a specific time range (used when time range changes)
+    async function loadImagesForTimeRange(fromTs, toTs) {
+      try {
+        log(`Fetching images from ${fromTs} to ${toTs}...`, 'info');
+        
+        const images = await fetchImagesForRange(fromTs, toTs);
+        
+        radarData.images = images
+          .filter(img => img.url && img.status !== 'no-image')
+          .map(img => ({
+            _id: img._id,
+            url: img.url,
+            timestamp: parseTimestamp(img._id).getTime(),
+            dateStr: img._id,
+            date: parseTimestamp(img._id)
+          }));
+        
+        log(`Loaded ${radarData.images.length} images`, 'success');
+        
+        initDatePickers();
+        return true;
+      } catch (error) {
+        log('Failed to load images: ' + error.message, 'error');
+        return false;
+      }
     }
 
     // ============================================================
@@ -1209,17 +1334,9 @@
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-        
         img.onload = () => resolve(img);
-        img.onerror = () => {
-          const directImg = new Image();
-          directImg.crossOrigin = 'anonymous';
-          directImg.onload = () => resolve(directImg);
-          directImg.onerror = () => reject(new Error(`Failed to load: ${url}`));
-          directImg.src = url;
-        };
-        img.src = proxyUrl;
+        img.onerror = () => reject(new Error(`Failed to load: ${url}`));
+        img.src = url;
       });
     }
 
@@ -1269,10 +1386,9 @@
       log(`Processing ${filteredImages.length} images from selected time range...`, 'info');
       
       const images = [];
-      const imageUrls = filteredImages.map(img => IMS_RADAR_BASE + img.name);
       
       // Load all images
-      for (let i = 0; i < imageUrls.length; i++) {
+      for (let i = 0; i < filteredImages.length; i++) {
         // Check if we should abort (new processing started)
         if (abortProcessing || thisProcessingId !== currentProcessingId) {
           log('Processing cancelled - new time range selected', 'info');
@@ -1280,17 +1396,17 @@
           return;
         }
         
-        const url = imageUrls[i];
-        const imageName = filteredImages[i].name;
+        const imgData = filteredImages[i];
+        const url = imgData.url;
         
         try {
           const img = await loadImage(url);
           images.push(img);
           stats.loadedImages++;
           
-          const progress = ((i + 1) / imageUrls.length) * 100;
+          const progress = ((i + 1) / filteredImages.length) * 100;
           progressFill.style.width = `${progress}%`;
-          progressText.textContent = `Loading ${i + 1}/${imageUrls.length}`;
+          progressText.textContent = `Loading ${i + 1}/${filteredImages.length}`;
           
         } catch (error) {
           // Don't log individual failures to reduce noise
@@ -1431,33 +1547,40 @@
     // ============================================================
     // REFRESH DATA FROM API
     // ============================================================
-    function refreshData() {
+    async function refreshData() {
       refreshBtn.disabled = true;
       refreshBtnText.innerHTML = '<span class="spinner"></span> Refreshing...';
       
-      // Save current slider positions
-      const currentMin = parseInt(rangeMin.value);
-      const currentMax = parseInt(rangeMax.value);
-      const oldTotal = radarData.images.length;
-      
-      // Regenerate image list with current time
-      loadRadarData();
-      
-      // Restore relative slider positions (keep same time range)
-      const newTotal = radarData.images.length;
-      if (oldTotal > 0 && newTotal > 0) {
-        // Adjust positions to maintain same relative range
-        const minRatio = currentMin / (oldTotal - 1);
-        const maxRatio = currentMax / (oldTotal - 1);
-        rangeMin.value = Math.round(minRatio * (newTotal - 1));
-        rangeMax.value = Math.round(maxRatio * (newTotal - 1));
-        updateRangeSlider();
+      try {
+        // Step 1: Get updated time range
+        const timeRange = await fetchTimeRange();
+        radarData.timeRange = timeRange;
+        log(`Data range: ${timeRange.start} to ${timeRange.end}`, 'info');
+        
+        // Step 2: Import any new images
+        await updateToLatest();
+        
+        // Step 3: Refresh the current time range of images
+        // Get the current displayed time range from the slider
+        if (radarData.images.length > 0) {
+          const minIdx = parseInt(rangeMin.value);
+          const maxIdx = parseInt(rangeMax.value);
+          const fromTs = radarData.images[minIdx]?.dateStr || timeRange.start;
+          const toTs = radarData.images[maxIdx]?.dateStr || timeRange.end;
+          
+          await loadImagesForTimeRange(fromTs, toTs);
+        } else {
+          // No images loaded, load last 24 hours
+          await loadRadarData();
+        }
+        
+        processImages();
+      } catch (error) {
+        log('Refresh failed: ' + error.message, 'error');
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtnText.textContent = '🔄 Refresh';
       }
-      
-      refreshBtn.disabled = false;
-      refreshBtnText.textContent = '🔄 Refresh';
-      
-      processImages();
     }
 
     // ============================================================
@@ -1516,31 +1639,42 @@
       presetButtons.forEach(btn => btn.classList.remove('active'));
     }
     
-    function setTimePreset(days) {
-      if (radarData.images.length === 0) return;
+    async function setTimePreset(days) {
+      if (!radarData.timeRange.end) {
+        log('No time range available yet', 'error');
+        return;
+      }
       
-      // Calculate how many images correspond to the days
-      // Images are every 5 minutes, so 288 images per day
-      const imagesPerDay = 288;
-      const totalImages = radarData.images.length;
-      const imagesNeeded = days * imagesPerDay;
+      // Calculate time range for the preset
+      const endDate = parseTimestamp(radarData.timeRange.end);
+      const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
       
-      // Set range to show last N days (most recent images)
-      const fromIndex = Math.max(0, totalImages - imagesNeeded);
-      const toIndex = totalImages - 1;
+      // Clamp to available data range
+      const availableStart = parseTimestamp(radarData.timeRange.start);
+      const actualStart = new Date(Math.max(startDate.getTime(), availableStart.getTime()));
       
-      rangeMin.value = fromIndex;
-      rangeMax.value = toIndex;
+      const fromTs = formatTimestamp(actualStart);
+      const toTs = radarData.timeRange.end;
+      
+      // Load images for this time range from API
+      await loadImagesForTimeRange(fromTs, toTs);
+      
+      // Set sliders to full range of loaded images
+      rangeMin.value = 0;
+      rangeMax.value = Math.max(0, radarData.images.length - 1);
       updateRangeSlider();
-      debouncedProcess();
+      
+      processImages();
     }
     
     presetButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         clearPresetButtons();
         btn.classList.add('active');
+        btn.disabled = true;
         const days = parseInt(btn.dataset.days);
-        setTimePreset(days);
+        await setTimePreset(days);
+        btn.disabled = false;
       });
     });
     
@@ -1667,15 +1801,29 @@
     // Load basins layer (streams loaded on demand)
     loadBasins();
     
-    // Generate radar image list (synchronous)
-    loadRadarData();
+    // Initialize app with API data
+    async function initializeApp() {
+      log('Initializing radar application...', 'info');
+      
+      // Load radar data from API (last 24 hours by default)
+      const success = await loadRadarData();
+      
+      if (success && radarData.images.length > 0) {
+        // Set sliders to full range
+        rangeMin.value = 0;
+        rangeMax.value = radarData.images.length - 1;
+        updateRangeSlider();
+        
+        // Auto-process on load
+        log('Processing last 24 hours...', 'info');
+        processImages();
+      } else {
+        log('No images available to process', 'error');
+      }
+    }
     
-    // Set default to 1 day
-    setTimePreset(1);
-    
-    // Auto-process on load
-    log('Auto-processing last 24 hours...', 'info');
-    processImages();
+    // Start the app
+    initializeApp();
   </script>
 </body>
 </html>
