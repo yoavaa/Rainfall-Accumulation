@@ -1017,7 +1017,8 @@
     // ============================================================
     // RAINFALL TIMELINE GRAPH
     // ============================================================
-    let rainfallData = []; // Store rainfall intensity for each image
+    let rainfallData = []; // Store rainfall intensity for each loaded image
+    let rainfallDataCalculated = false; // Track if graph data needs recalculation
     
     function updateGraphLabels() {
       const graphStartLabel = document.getElementById('graphStartLabel');
@@ -1031,6 +1032,9 @@
         graphEndLabel.textContent = '--:--';
       }
     }
+    
+    // Store the graph image so we can redraw selection without recalculating bars
+    let graphImageData = null;
     
     function drawRainfallGraph() {
       const canvas = document.getElementById('rainfallGraph');
@@ -1048,25 +1052,29 @@
         ctx.font = '11px Outfit';
         ctx.textAlign = 'center';
         ctx.fillText('Loading rainfall data...', width / 2, height / 2);
+        graphImageData = null;
         return;
       }
       
-      // Find max value for scaling
+      // Find max value for scaling (use log scale)
       const maxVal = Math.max(...rainfallData, 1);
+      const logMax = Math.log10(maxVal + 1);
       
-      // Draw bars
+      // Draw bars with logarithmic Y-axis
       const barWidth = Math.max(1, width / rainfallData.length);
       
       for (let i = 0; i < rainfallData.length; i++) {
         const value = rainfallData[i];
-        const barHeight = (value / maxVal) * (height - 4);
+        // Logarithmic scale: log10(value + 1) / log10(max + 1)
+        const logValue = value > 0 ? Math.log10(value + 1) : 0;
+        const barHeight = (logValue / logMax) * (height - 4);
         const x = (i / rainfallData.length) * width;
         const y = height - barHeight - 2;
         
-        // Color based on intensity
-        if (value > maxVal * 0.7) {
+        // Color based on intensity (using original linear thresholds)
+        if (value > maxVal * 0.5) {
           ctx.fillStyle = '#ef4444'; // Red for high
-        } else if (value > maxVal * 0.4) {
+        } else if (value > maxVal * 0.2) {
           ctx.fillStyle = '#f59e0b'; // Orange for medium
         } else if (value > 0) {
           ctx.fillStyle = '#22d3ee'; // Cyan for low
@@ -1077,6 +1085,9 @@
         ctx.fillRect(x, y, barWidth + 0.5, barHeight);
       }
       
+      // Store the graph image (without selection) for later use
+      graphImageData = ctx.getImageData(0, 0, width, height);
+      
       // Draw selection overlay
       drawGraphSelection();
     }
@@ -1086,6 +1097,11 @@
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
+      
+      // Restore the base graph image first (without previous selection)
+      if (graphImageData) {
+        ctx.putImageData(graphImageData, 0, 0);
+      }
       
       if (radarData.images.length === 0) return;
       
@@ -1494,6 +1510,7 @@
         fromLabel.textContent = '--:--';
         toLabel.textContent = '--:--';
         rainfallData = [];
+        rainfallDataCalculated = false;
         drawRainfallGraph();
         return;
       }
@@ -1508,8 +1525,8 @@
       
       updateRangeSlider();
       
-      // Rainfall data will be calculated during processImages()
-      // Just draw empty graph for now
+      // Mark that we need to recalculate rainfall data for new loaded data
+      rainfallDataCalculated = false;
       rainfallData = [];
       drawRainfallGraph();
     }
@@ -1737,9 +1754,16 @@
       tempCanvas.height = height;
       const tempCtx = tempCanvas.getContext('2d');
       
-      // Reset rainfall data for graph - will be populated during processing
-      rainfallData = new Array(filteredImages.length).fill(0);
-
+      // Check if we need to calculate rainfall data for graph
+      // This should only happen once after new data is loaded, when processing all images
+      const isFullRange = filteredImages.length === radarData.images.length;
+      const shouldCalculateRainfall = !rainfallDataCalculated && isFullRange;
+      
+      // Initialize rainfall data array if we're calculating
+      if (shouldCalculateRainfall) {
+        rainfallData = new Array(radarData.images.length).fill(0);
+      }
+      
       // Process each image
       for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
         const img = images[imgIdx];
@@ -1759,9 +1783,8 @@
         
         const imgData = tempCtx.getImageData(0, 0, width, height);
         
-        // Track total intensity for this image (for graph)
+        // Track total intensity for this image (for graph) - only on first calculation
         let imageIntensitySum = 0;
-        let imagePixelCount = 0;
         
         for (let i = 0; i < imgData.data.length; i += 4) {
           const r = imgData.data[i];
@@ -1776,21 +1799,32 @@
             accumulatedMatrix[pixelIndex] += intensity / 12 // convert mm/5min to mm amount;
             hitCount[pixelIndex]++;
             
-            // Also track for graph
-            imageIntensitySum += intensity;
-            imagePixelCount++;
+            // Also track for graph (only if we're calculating)
+            if (shouldCalculateRainfall) {
+              imageIntensitySum += intensity;
+            }
           }
         }
 
-
-        // Store average intensity for this image in graph data
-        rainfallData[imgIdx] = imageIntensitySum;
+        // Store intensity for this image in graph data (only on first full calculation)
+        if (shouldCalculateRainfall) {
+          // Since we're processing full range, imgIdx directly maps to rainfallData index
+          rainfallData[imgIdx] = imageIntensitySum;
+        }
+        
         const progress = ((imgIdx + 1) / images.length) * 100;
         progressFill.style.width = `${progress}%`;
         progressText.textContent = `Processing ${imgIdx + 1}/${images.length}`;
       }
-      // Draw the rainfall graph now that we have all data
-      drawRainfallGraph();
+      
+      // If this was a full data calculation (all images), mark as complete and draw graph
+      if (shouldCalculateRainfall && filteredImages.length === radarData.images.length) {
+        rainfallDataCalculated = true;
+        drawRainfallGraph();
+      } else if (rainfallDataCalculated) {
+        // Just update the selection overlay
+        drawGraphSelection();
+      }
       
       log('Rendering final image...', 'info');
       progressText.textContent = 'Rendering...';
@@ -1946,8 +1980,8 @@
       // Reset playback range when user manually adjusts sliders
       playbackRangeStart = 0;
       playbackRangeEnd = 0;
-      // Redraw graph with new selection
-      drawRainfallGraph();
+      // Update selection overlay on graph (not full redraw)
+      drawGraphSelection();
       debouncedProcess();
     });
     rangeMax.addEventListener('input', () => {
@@ -1956,8 +1990,8 @@
       // Reset playback range when user manually adjusts sliders
       playbackRangeStart = 0;
       playbackRangeEnd = 0;
-      // Redraw graph with new selection
-      drawRainfallGraph();
+      // Update selection overlay on graph (not full redraw)
+      drawGraphSelection();
       debouncedProcess();
     });
     
