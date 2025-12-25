@@ -445,6 +445,38 @@
       color: var(--accent-cyan);
     }
     
+    .time-label-box.editable {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .time-label-box.editable:hover {
+      background: var(--bg-secondary);
+      border: 1px solid var(--accent-cyan);
+    }
+    
+    .time-label-box.editable:hover .time-label-title::after {
+      content: ' ✏️';
+      font-size: 0.5rem;
+    }
+    
+    .time-input {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.25rem;
+      margin-top: 0.25rem;
+    }
+    
+    .time-input::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      cursor: pointer;
+    }
+    
     .range-slider-container {
       position: relative;
       height: 40px;
@@ -720,13 +752,15 @@
           <button class="preset-btn" data-hours="720">30d</button>
         </div>
         <div class="time-labels" style="margin-bottom: 0.75rem;">
-          <div class="time-label-box">
+          <div class="time-label-box editable" id="loadedFromBox">
             <div class="time-label-title">Loaded From</div>
-            <div class="time-label-value" id="loadedFromLabel">--:--</div>
+            <div class="time-label-value" id="loadedFromLabel">--/--/-- --:--</div>
+            <input type="datetime-local" class="time-input" id="loadedFromInput" style="display: none;">
           </div>
-          <div class="time-label-box">
+          <div class="time-label-box editable" id="loadedToBox">
             <div class="time-label-title">Loaded To</div>
-            <div class="time-label-value" id="loadedToLabel">--:--</div>
+            <div class="time-label-value" id="loadedToLabel">--/--/-- --:--</div>
+            <input type="datetime-local" class="time-input" id="loadedToInput" style="display: none;">
           </div>
         </div>
         <button id="refreshBtn" class="btn btn-primary">
@@ -1464,9 +1498,10 @@
     
     // Format date for display
     function formatDateDisplay(date) {
-      if (!date) return '--:--';
+      if (!date) return '--/--/-- --:--';
       const pad = n => n.toString().padStart(2, '0');
-      return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      const year = date.getFullYear().toString().slice(-2); // Last 2 digits of year
+      return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${year} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
     
     // Get filtered images based on slider range
@@ -1937,6 +1972,106 @@
       refreshBtnText.textContent = '🔄 Refresh';
       }
     }
+
+    // ============================================================
+    // ============================================================
+    // EDITABLE DATE FIELDS
+    // ============================================================
+    const loadedFromBox = document.getElementById('loadedFromBox');
+    const loadedToBox = document.getElementById('loadedToBox');
+    const loadedFromInput = document.getElementById('loadedFromInput');
+    const loadedToInput = document.getElementById('loadedToInput');
+    const loadedFromLabel = document.getElementById('loadedFromLabel');
+    const loadedToLabel = document.getElementById('loadedToLabel');
+    
+    // Convert Date to datetime-local input format
+    function toDateTimeLocal(date) {
+      const pad = n => n.toString().padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    
+    // Handle click on "Loaded From" box
+    loadedFromBox.addEventListener('click', (e) => {
+      if (e.target === loadedFromInput) return; // Don't toggle if clicking input
+      
+      const isVisible = loadedFromInput.style.display !== 'none';
+      if (isVisible) {
+        loadedFromInput.style.display = 'none';
+      } else {
+        // Set current value
+        if (radarData.images.length > 0) {
+          loadedFromInput.value = toDateTimeLocal(radarData.images[0].date);
+        }
+        loadedFromInput.style.display = 'block';
+        loadedFromInput.focus();
+      }
+    });
+    
+    // Handle click on "Loaded To" box
+    loadedToBox.addEventListener('click', (e) => {
+      if (e.target === loadedToInput) return;
+      
+      const isVisible = loadedToInput.style.display !== 'none';
+      if (isVisible) {
+        loadedToInput.style.display = 'none';
+      } else {
+        if (radarData.images.length > 0) {
+          loadedToInput.value = toDateTimeLocal(radarData.images[radarData.images.length - 1].date);
+        }
+        loadedToInput.style.display = 'block';
+        loadedToInput.focus();
+      }
+    });
+    
+    // Handle date change for "Loaded From"
+    loadedFromInput.addEventListener('change', async () => {
+      const newFromDate = new Date(loadedFromInput.value);
+      if (isNaN(newFromDate.getTime())) return;
+      
+      // Get current "to" date
+      let toTs = radarData.timeRange.end;
+      if (radarData.images.length > 0) {
+        toTs = radarData.images[radarData.images.length - 1].dateStr;
+      }
+      
+      const fromTs = formatTimestamp(newFromDate);
+      
+      loadedFromInput.style.display = 'none';
+      clearPresetButtons();
+      
+      await loadImagesForTimeRange(fromTs, toTs);
+      processImages();
+    });
+    
+    // Handle date change for "Loaded To"
+    loadedToInput.addEventListener('change', async () => {
+      const newToDate = new Date(loadedToInput.value);
+      if (isNaN(newToDate.getTime())) return;
+      
+      // Get current "from" date
+      let fromTs = radarData.timeRange.start;
+      if (radarData.images.length > 0) {
+        fromTs = radarData.images[0].dateStr;
+      }
+      
+      const toTs = formatTimestamp(newToDate);
+      
+      loadedToInput.style.display = 'none';
+      clearPresetButtons();
+      
+      await loadImagesForTimeRange(fromTs, toTs);
+      processImages();
+    });
+    
+    // Hide inputs when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!loadedFromBox.contains(e.target)) {
+        loadedFromInput.style.display = 'none';
+      }
+      if (!loadedToBox.contains(e.target)) {
+        loadedToInput.style.display = 'none';
+      }
+    });
 
     // ============================================================
     // EVENT LISTENERS
