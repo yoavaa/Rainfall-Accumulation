@@ -1740,7 +1740,6 @@
       // Reset rainfall data for graph - will be populated during processing
       rainfallData = new Array(filteredImages.length).fill(0);
 
-      const pictures = [];
       // Process each image
       for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
         const img = images[imgIdx];
@@ -1783,15 +1782,13 @@
           }
         }
 
-          pictures.push({img, imageIntensitySum, imagePixelCount});
-        
+
         // Store average intensity for this image in graph data
         rainfallData[imgIdx] = imageIntensitySum;
         const progress = ((imgIdx + 1) / images.length) * 100;
         progressFill.style.width = `${progress}%`;
         progressText.textContent = `Processing ${imgIdx + 1}/${images.length}`;
       }
-      console.log(pictures)
       // Draw the rainfall graph now that we have all data
       drawRainfallGraph();
       
