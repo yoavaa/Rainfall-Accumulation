@@ -243,6 +243,39 @@
       font-size: 0.65rem;
     }
     
+    /* Rainfall graph */
+    .graph-container {
+      background: var(--bg-primary);
+      border-radius: 6px;
+      padding: 0.5rem;
+      position: relative;
+    }
+    
+    #rainfallGraph {
+      width: 100%;
+      height: 80px;
+      display: block;
+    }
+    
+    .graph-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+    
+    .graph-selection {
+      position: absolute;
+      top: 0.5rem;
+      height: 80px;
+      background: rgba(34, 211, 238, 0.15);
+      border-left: 2px solid var(--accent-cyan);
+      border-right: 2px solid var(--accent-emerald);
+      pointer-events: none;
+    }
+    
     /* Log panel */
     .log-panel {
       flex: 1;
@@ -310,15 +343,16 @@
     
     .preset-btn {
       flex: 1;
-      padding: 0.5rem;
+      padding: 0.4rem 0.25rem;
       background: var(--bg-tertiary);
       border: 1px solid var(--border-color);
       border-radius: 6px;
       color: var(--text-secondary);
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      min-width: 0;
     }
     
     .preset-btn:hover {
@@ -672,44 +706,29 @@
       </div>
       
       <div class="panel">
-        <div class="panel-title">Time Range</div>
-        <div class="time-range-container">
-          <div class="preset-buttons">
-            <button class="preset-btn" data-hours="3">3h</button>
-            <button class="preset-btn" data-hours="6">6h</button>
-            <button class="preset-btn" data-hours="12">12h</button>
-            <button class="preset-btn active" data-hours="24">1d</button>
-            <button class="preset-btn" data-hours="168">7d</button>
-            <button class="preset-btn" data-hours="336">14d</button>
-            <button class="preset-btn" data-hours="720">30d</button>
+        <div class="panel-title">Load Data</div>
+        <div class="preset-buttons" style="margin-bottom: 0.75rem;">
+          <button class="preset-btn" data-hours="1">1h</button>
+          <button class="preset-btn" data-hours="3">3h</button>
+          <button class="preset-btn" data-hours="6">6h</button>
+          <button class="preset-btn" data-hours="12">12h</button>
+        </div>
+        <div class="preset-buttons" style="margin-bottom: 0.75rem;">
+          <button class="preset-btn active" data-hours="24">1d</button>
+          <button class="preset-btn" data-hours="168">7d</button>
+          <button class="preset-btn" data-hours="336">14d</button>
+          <button class="preset-btn" data-hours="720">30d</button>
+        </div>
+        <div class="time-labels" style="margin-bottom: 0.75rem;">
+          <div class="time-label-box">
+            <div class="time-label-title">Loaded From</div>
+            <div class="time-label-value" id="loadedFromLabel">--:--</div>
           </div>
-          <div class="time-labels">
-            <div class="time-label-box">
-              <div class="time-label-title">From</div>
-              <div class="time-label-value" id="fromLabel">--:--</div>
-            </div>
-            <div class="time-label-box">
-              <div class="time-label-title">To</div>
-              <div class="time-label-value" id="toLabel">--:--</div>
-            </div>
-          </div>
-          <div class="range-slider-container">
-            <div class="range-track"></div>
-            <div class="range-selected" id="rangeSelected"></div>
-            <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
-            <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
-          </div>
-          <div class="playback-controls">
-            <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
-            <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
-            <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
-            <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
+          <div class="time-label-box">
+            <div class="time-label-title">Loaded To</div>
+            <div class="time-label-value" id="loadedToLabel">--:--</div>
           </div>
         </div>
-      </div>
-      
-      <div class="panel">
-        <div class="panel-title">Controls</div>
         <button id="refreshBtn" class="btn btn-primary">
           <span id="refreshBtnText">🔄 Refresh</span>
         </button>
@@ -718,6 +737,43 @@
             <div class="progress-fill" id="progressFill"></div>
           </div>
           <div class="progress-text" id="progressText">Loading...</div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Rainfall Timeline</div>
+        <div class="graph-container">
+          <canvas id="rainfallGraph" width="280" height="80"></canvas>
+          <div class="graph-labels">
+            <span id="graphStartLabel">--:--</span>
+            <span id="graphEndLabel">--:--</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Display Range</div>
+        <div class="time-labels" style="margin-bottom: 0.5rem;">
+          <div class="time-label-box">
+            <div class="time-label-title">From</div>
+            <div class="time-label-value" id="fromLabel">--:--</div>
+          </div>
+          <div class="time-label-box">
+            <div class="time-label-title">To</div>
+            <div class="time-label-value" id="toLabel">--:--</div>
+          </div>
+        </div>
+        <div class="range-slider-container">
+          <div class="range-track"></div>
+          <div class="range-selected" id="rangeSelected"></div>
+          <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
+          <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
+        </div>
+        <div class="playback-controls">
+          <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
+          <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
+          <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
+          <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
         </div>
       </div>
       
@@ -938,6 +994,130 @@
         apiEndLabel.textContent = formatDateDisplay(parseTimestamp(radarData.timeRange.end));
       }
     }
+    
+    // Update loaded data range display in sidebar
+    function updateLoadedRangeDisplay() {
+      const loadedFromLabel = document.getElementById('loadedFromLabel');
+      const loadedToLabel = document.getElementById('loadedToLabel');
+      
+      if (radarData.images.length > 0) {
+        const firstImg = radarData.images[0];
+        const lastImg = radarData.images[radarData.images.length - 1];
+        loadedFromLabel.textContent = formatDateDisplay(firstImg.date);
+        loadedToLabel.textContent = formatDateDisplay(lastImg.date);
+      } else {
+        loadedFromLabel.textContent = '--:--';
+        loadedToLabel.textContent = '--:--';
+      }
+      
+      // Update graph labels
+      updateGraphLabels();
+    }
+    
+    // ============================================================
+    // RAINFALL TIMELINE GRAPH
+    // ============================================================
+    let rainfallData = []; // Store rainfall intensity for each image
+    
+    function updateGraphLabels() {
+      const graphStartLabel = document.getElementById('graphStartLabel');
+      const graphEndLabel = document.getElementById('graphEndLabel');
+      
+      if (radarData.images.length > 0) {
+        graphStartLabel.textContent = formatDateDisplay(radarData.images[0].date);
+        graphEndLabel.textContent = formatDateDisplay(radarData.images[radarData.images.length - 1].date);
+      } else {
+        graphStartLabel.textContent = '--:--';
+        graphEndLabel.textContent = '--:--';
+      }
+    }
+    
+    function drawRainfallGraph() {
+      const canvas = document.getElementById('rainfallGraph');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      // Clear canvas
+      ctx.fillStyle = '#0a0e17';
+      ctx.fillRect(0, 0, width, height);
+      
+      if (rainfallData.length === 0) {
+        // Draw placeholder text
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px Outfit';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading rainfall data...', width / 2, height / 2);
+        return;
+      }
+      
+      // Find max value for scaling
+      const maxVal = Math.max(...rainfallData, 1);
+      
+      // Draw bars
+      const barWidth = Math.max(1, width / rainfallData.length);
+      
+      for (let i = 0; i < rainfallData.length; i++) {
+        const value = rainfallData[i];
+        const barHeight = (value / maxVal) * (height - 4);
+        const x = (i / rainfallData.length) * width;
+        const y = height - barHeight - 2;
+        
+        // Color based on intensity
+        if (value > maxVal * 0.7) {
+          ctx.fillStyle = '#ef4444'; // Red for high
+        } else if (value > maxVal * 0.4) {
+          ctx.fillStyle = '#f59e0b'; // Orange for medium
+        } else if (value > 0) {
+          ctx.fillStyle = '#22d3ee'; // Cyan for low
+        } else {
+          ctx.fillStyle = '#1e293b'; // Dark for none
+        }
+        
+        ctx.fillRect(x, y, barWidth + 0.5, barHeight);
+      }
+      
+      // Draw selection overlay
+      drawGraphSelection();
+    }
+    
+    function drawGraphSelection() {
+      const canvas = document.getElementById('rainfallGraph');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      if (radarData.images.length === 0) return;
+      
+      const minIdx = parseInt(rangeMin.value);
+      const maxIdx = parseInt(rangeMax.value);
+      const total = radarData.images.length - 1;
+      
+      if (total <= 0) return;
+      
+      const startX = (Math.min(minIdx, maxIdx) / total) * width;
+      const endX = (Math.max(minIdx, maxIdx) / total) * width;
+      
+      // Draw selection highlight
+      ctx.fillStyle = 'rgba(34, 211, 238, 0.2)';
+      ctx.fillRect(startX, 0, endX - startX, height);
+      
+      // Draw selection borders
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(startX, 0);
+      ctx.lineTo(startX, height);
+      ctx.stroke();
+      
+      ctx.strokeStyle = '#10b981';
+      ctx.beginPath();
+      ctx.moveTo(endX, 0);
+      ctx.lineTo(endX, height);
+      ctx.stroke();
+    }
+    
+    // Rainfall data is now calculated during processImages() for efficiency
     
     // Main function to load radar data from API
     async function loadRadarData() {
@@ -1307,9 +1487,14 @@
     
     // Initialize range slider
     function initDatePickers() {
+      // Update loaded range display
+      updateLoadedRangeDisplay();
+      
       if (radarData.images.length === 0) {
         fromLabel.textContent = '--:--';
         toLabel.textContent = '--:--';
+        rainfallData = [];
+        drawRainfallGraph();
         return;
       }
       
@@ -1322,6 +1507,11 @@
       rangeMax.value = maxIdx;
       
       updateRangeSlider();
+      
+      // Rainfall data will be calculated during processImages()
+      // Just draw empty graph for now
+      rainfallData = [];
+      drawRainfallGraph();
     }
 
     // ============================================================
@@ -1547,6 +1737,10 @@
       tempCanvas.height = height;
       const tempCtx = tempCanvas.getContext('2d');
       
+      // Reset rainfall data for graph - will be populated during processing
+      rainfallData = new Array(filteredImages.length).fill(0);
+
+      const pictures = [];
       // Process each image
       for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
         const img = images[imgIdx];
@@ -1566,6 +1760,10 @@
         
         const imgData = tempCtx.getImageData(0, 0, width, height);
         
+        // Track total intensity for this image (for graph)
+        let imageIntensitySum = 0;
+        let imagePixelCount = 0;
+        
         for (let i = 0; i < imgData.data.length; i += 4) {
           const r = imgData.data[i];
           const g = imgData.data[i + 1];
@@ -1578,13 +1776,24 @@
             const intensity = rgbToIntensity(r, g, b);
             accumulatedMatrix[pixelIndex] += intensity / 12 // convert mm/5min to mm amount;
             hitCount[pixelIndex]++;
+            
+            // Also track for graph
+            imageIntensitySum += intensity;
+            imagePixelCount++;
           }
         }
+
+          pictures.push({img, imageIntensitySum, imagePixelCount});
         
+        // Store average intensity for this image in graph data
+        rainfallData[imgIdx] = imageIntensitySum;
         const progress = ((imgIdx + 1) / images.length) * 100;
         progressFill.style.width = `${progress}%`;
         progressText.textContent = `Processing ${imgIdx + 1}/${images.length}`;
       }
+      console.log(pictures)
+      // Draw the rainfall graph now that we have all data
+      drawRainfallGraph();
       
       log('Rendering final image...', 'info');
       progressText.textContent = 'Rendering...';
@@ -1740,6 +1949,8 @@
       // Reset playback range when user manually adjusts sliders
       playbackRangeStart = 0;
       playbackRangeEnd = 0;
+      // Redraw graph with new selection
+      drawRainfallGraph();
       debouncedProcess();
     });
     rangeMax.addEventListener('input', () => {
@@ -1748,6 +1959,8 @@
       // Reset playback range when user manually adjusts sliders
       playbackRangeStart = 0;
       playbackRangeEnd = 0;
+      // Redraw graph with new selection
+      drawRainfallGraph();
       debouncedProcess();
     });
     
