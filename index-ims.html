@@ -1058,7 +1058,7 @@
       
       // Find max value for scaling (use log scale)
       const maxVal = Math.max(...rainfallData, 1);
-      const logMax = Math.log10(maxVal + 1);
+      // const logMax = Math.log10(maxVal + 1);
       
       // Draw bars with logarithmic Y-axis
       const barWidth = Math.max(1, width / rainfallData.length);
@@ -1066,8 +1066,8 @@
       for (let i = 0; i < rainfallData.length; i++) {
         const value = rainfallData[i];
         // Logarithmic scale: log10(value + 1) / log10(max + 1)
-        const logValue = value > 0 ? Math.log10(value + 1) : 0;
-        const barHeight = (logValue / logMax) * (height - 4);
+        // const logValue = value > 0 ? Math.log10(value + 1) : 0;
+        const barHeight = (value / maxVal) * (height - 4);
         const x = (i / rainfallData.length) * width;
         const y = height - barHeight - 2;
         
