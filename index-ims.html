@@ -1253,6 +1253,9 @@
     // Load images for a specific time range (used when time range changes)
     // Handles pagination since API returns max 300 images per request
     async function loadImagesForTimeRange(fromTs, toTs) {
+      // Cancel any ongoing processing before loading new data
+      await cancelProcessing();
+      
       try {
         const fromDate = parseTimestamp(fromTs);
         const toDate = parseTimestamp(toTs);
@@ -1690,6 +1693,23 @@
     let abortProcessing = false;
     let currentProcessingId = 0;
     
+    // Cancel any ongoing processing
+    async function cancelProcessing() {
+      if (isProcessing) {
+        abortProcessing = true;
+        log('Cancelling previous processing...', 'info');
+        // Wait for the previous processing to stop (up to 2 seconds)
+        let waitCount = 0;
+        while (isProcessing && waitCount < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+        }
+        if (isProcessing) {
+          log('Warning: Previous processing did not stop in time', 'error');
+        }
+      }
+    }
+    
     async function processImages() {
       // If already processing, abort the previous run
       if (isProcessing) {
@@ -1953,6 +1973,9 @@
       refreshBtn.disabled = true;
       refreshBtnText.innerHTML = '<span class="spinner"></span> Refreshing...';
       
+      // Cancel any ongoing processing
+      await cancelProcessing();
+      
       try {
         // Step 1: Get updated time range
         const timeRange = await fetchTimeRange();
@@ -2039,8 +2062,11 @@
       }
     });
     
-    // Handle date change for "Loaded From"
-    loadedFromInput.addEventListener('change', async () => {
+    // Debounce timer for date inputs
+    let dateInputDebounceTimer = null;
+    
+    // Handle date change for "Loaded From" (debounced)
+    async function handleFromDateChange() {
       const newFromDate = new Date(loadedFromInput.value);
       if (isNaN(newFromDate.getTime())) return;
       
@@ -2060,10 +2086,10 @@
       
       await loadImagesForTimeRange(fromTs, toTs);
       processImages();
-    });
+    }
     
-    // Handle date change for "Loaded To"
-    loadedToInput.addEventListener('change', async () => {
+    // Handle date change for "Loaded To" (debounced)
+    async function handleToDateChange() {
       const newToDate = new Date(loadedToInput.value);
       if (isNaN(newToDate.getTime())) return;
       
@@ -2083,6 +2109,22 @@
       
       await loadImagesForTimeRange(fromTs, toTs);
       processImages();
+    }
+    
+    loadedFromInput.addEventListener('change', () => {
+      // Debounce: wait 1 second before triggering
+      if (dateInputDebounceTimer) clearTimeout(dateInputDebounceTimer);
+      dateInputDebounceTimer = setTimeout(() => {
+        handleFromDateChange();
+      }, 1000);
+    });
+    
+    loadedToInput.addEventListener('change', () => {
+      // Debounce: wait 1 second before triggering
+      if (dateInputDebounceTimer) clearTimeout(dateInputDebounceTimer);
+      dateInputDebounceTimer = setTimeout(() => {
+        handleToDateChange();
+      }, 1000);
     });
     
     // Hide inputs when clicking outside
@@ -2166,6 +2208,9 @@
         log('No time range available yet', 'error');
         return;
       }
+      
+      // Cancel any ongoing processing before loading new data
+      await cancelProcessing();
       
       // Track that we're using a preset (not manual dates)
       activePresetHours = hours;
