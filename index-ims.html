@@ -726,16 +726,16 @@
       <div class="panel">
         <div class="panel-title">Available Data</div>
         <div class="time-labels" style="margin-bottom: 0;">
-          <div class="time-label-box">
+            <div class="time-label-box">
             <div class="time-label-title">Earliest</div>
             <div class="time-label-value" id="apiStartLabel">--:--</div>
-          </div>
-          <div class="time-label-box">
+            </div>
+            <div class="time-label-box">
             <div class="time-label-title">Latest</div>
             <div class="time-label-value" id="apiEndLabel">--:--</div>
+            </div>
           </div>
-        </div>
-      </div>
+          </div>
       
       <div class="panel">
         <div class="panel-title">Load Data</div>
@@ -744,7 +744,7 @@
           <button class="preset-btn" data-hours="3">3h</button>
           <button class="preset-btn" data-hours="6">6h</button>
           <button class="preset-btn" data-hours="12">12h</button>
-        </div>
+          </div>
         <div class="preset-buttons" style="margin-bottom: 0.75rem;">
           <button class="preset-btn active" data-hours="24">1d</button>
           <button class="preset-btn" data-hours="168">7d</button>
@@ -756,7 +756,7 @@
             <div class="time-label-title">Loaded From</div>
             <div class="time-label-value" id="loadedFromLabel">--/--/-- --:--</div>
             <input type="datetime-local" class="time-input" id="loadedFromInput" style="display: none;">
-          </div>
+      </div>
           <div class="time-label-box editable" id="loadedToBox">
             <div class="time-label-title">Loaded To</div>
             <div class="time-label-value" id="loadedToLabel">--/--/-- --:--</div>
@@ -1053,6 +1053,10 @@
     // ============================================================
     let rainfallData = []; // Store rainfall intensity for each loaded image
     let rainfallDataCalculated = false; // Track if graph data needs recalculation
+    
+    // Track how the current time range was set
+    let activePresetHours = 24; // Current preset in hours (null if manual dates)
+    let isManualDateRange = false; // True if user entered specific dates
     
     function updateGraphLabels() {
       const graphStartLabel = document.getElementById('graphStartLabel');
@@ -1945,22 +1949,26 @@
         // Step 1: Get updated time range
         const timeRange = await fetchTimeRange();
         radarData.timeRange = timeRange;
+        updateApiTimeRangeDisplay();
         log(`Data range: ${timeRange.start} to ${timeRange.end}`, 'info');
         
         // Step 2: Import any new images
         await updateToLatest();
         
-        // Step 3: Refresh the current time range of images
-        // Get the current displayed time range from the slider
-        if (radarData.images.length > 0) {
-          const minIdx = parseInt(rangeMin.value);
-          const maxIdx = parseInt(rangeMax.value);
-          const fromTs = radarData.images[minIdx]?.dateStr || timeRange.start;
-          const toTs = radarData.images[maxIdx]?.dateStr || timeRange.end;
-          
+        // Step 3: Reload data based on how the range was set
+        if (isManualDateRange && radarData.images.length > 0) {
+          // Manual date range: keep the same specific dates
+          const fromTs = radarData.images[0].dateStr;
+          const toTs = radarData.images[radarData.images.length - 1].dateStr;
+          log(`Refreshing manual range: ${fromTs} to ${toTs}`, 'info');
           await loadImagesForTimeRange(fromTs, toTs);
+        } else if (activePresetHours) {
+          // Preset: recalculate relative to current time (latest available)
+          log(`Refreshing preset: last ${activePresetHours} hours`, 'info');
+          await setTimePreset(activePresetHours);
+          return; // setTimePreset already calls processImages
         } else {
-          // No images loaded, load last 24 hours
+          // Fallback: load last 24 hours
           await loadRadarData();
         }
         
@@ -1968,8 +1976,8 @@
       } catch (error) {
         log('Refresh failed: ' + error.message, 'error');
       } finally {
-      refreshBtn.disabled = false;
-      refreshBtnText.textContent = '🔄 Refresh';
+        refreshBtn.disabled = false;
+        refreshBtnText.textContent = '🔄 Refresh';
       }
     }
 
@@ -2039,6 +2047,9 @@
       loadedFromInput.style.display = 'none';
       clearPresetButtons();
       
+      // Mark as manual date range
+      isManualDateRange = true;
+      
       await loadImagesForTimeRange(fromTs, toTs);
       processImages();
     });
@@ -2058,6 +2069,9 @@
       
       loadedToInput.style.display = 'none';
       clearPresetButtons();
+      
+      // Mark as manual date range
+      isManualDateRange = true;
       
       await loadImagesForTimeRange(fromTs, toTs);
       processImages();
@@ -2144,6 +2158,10 @@
         log('No time range available yet', 'error');
         return;
       }
+      
+      // Track that we're using a preset (not manual dates)
+      activePresetHours = hours;
+      isManualDateRange = false;
       
       // Calculate time range for the preset
       const endDate = parseTimestamp(radarData.timeRange.end);
