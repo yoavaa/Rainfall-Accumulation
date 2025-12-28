@@ -2204,11 +2204,6 @@
     }
     
     async function setTimePreset(hours) {
-      if (!radarData.timeRange.end) {
-        log('No time range available yet', 'error');
-        return;
-      }
-      
       // Cancel any ongoing processing before loading new data
       await cancelProcessing();
       
@@ -2216,7 +2211,28 @@
       activePresetHours = hours;
       isManualDateRange = false;
       
-      // Calculate time range for the preset
+      // Show progress
+      progressContainer.style.display = 'block';
+      progressText.textContent = 'Updating to latest...';
+      progressFill.style.width = '10%';
+      
+      try {
+        // Fetch latest time range from API
+        const timeRange = await fetchTimeRange();
+        radarData.timeRange = timeRange;
+        updateApiTimeRangeDisplay();
+        
+        // Import any new images
+        await updateToLatest();
+      } catch (error) {
+        log('Failed to update: ' + error.message, 'error');
+        if (!radarData.timeRange.end) {
+          log('No time range available', 'error');
+          return;
+        }
+      }
+      
+      // Calculate time range for the preset using latest data
       const endDate = parseTimestamp(radarData.timeRange.end);
       const startDate = new Date(endDate.getTime() - hours * 60 * 60 * 1000);
       
