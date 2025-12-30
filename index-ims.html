@@ -720,7 +720,7 @@
     <div class="sidebar">
       <div class="sidebar-header">
         <h1>☁️ IMS Rainfall Accumulation</h1>
-        <p class="subtitle">Historical radar data (API-powered)</p>
+        <p class="subtitle">Based on Historical IMS radar data</p>
       </div>
       
       <div class="panel">
@@ -2007,8 +2007,8 @@
       } catch (error) {
         log('Refresh failed: ' + error.message, 'error');
       } finally {
-        refreshBtn.disabled = false;
-        refreshBtnText.textContent = '🔄 Refresh';
+      refreshBtn.disabled = false;
+      refreshBtnText.textContent = '🔄 Refresh';
       }
     }
 
