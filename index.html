@@ -676,6 +676,48 @@
       display: none;
     }
     
+    /* Rainfall tooltip on map hover */
+    .rainfall-tooltip {
+      position: absolute;
+      background: rgba(10, 14, 23, 0.95);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      pointer-events: none;
+      z-index: 1000;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transform: translate(-50%, -100%);
+      margin-top: -10px;
+    }
+    
+    .rainfall-tooltip::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid var(--accent-cyan);
+    }
+    
+    .rainfall-tooltip .value {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    
+    .rainfall-tooltip.no-data {
+      border-color: var(--text-secondary);
+    }
+    
+    .rainfall-tooltip.no-data::after {
+      border-top-color: var(--text-secondary);
+    }
+    
     /* Responsive */
     @media (max-width: 768px) {
       .app-container {
@@ -860,6 +902,9 @@
   
   <!-- Hidden canvas for image processing -->
   <canvas id="processingCanvas"></canvas>
+  
+  <!-- Rainfall tooltip (shown on hover/tap) -->
+  <div id="rainfallTooltip" class="rainfall-tooltip" style="display: none;"></div>
 
   <!-- Leaflet JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -1703,6 +1748,11 @@
     let abortProcessing = false;
     let currentProcessingId = 0;
     
+    // Store accumulated matrix globally for hover lookup
+    let currentAccumulatedMatrix = null;
+    let currentMatrixWidth = 0;
+    let currentMatrixHeight = 0;
+    
     // Cancel any ongoing processing
     async function cancelProcessing() {
       if (isProcessing) {
@@ -1906,6 +1956,11 @@
       log('Rendering final image...', 'info');
       progressText.textContent = 'Rendering...';
       refreshBtnText.innerHTML = '<span class="spinner"></span> Rendering...';
+      
+      // Store accumulated matrix globally for hover lookup
+      currentAccumulatedMatrix = accumulatedMatrix;
+      currentMatrixWidth = width;
+      currentMatrixHeight = height;
       
       // Create result image
       const resultData = ctx.createImageData(width, height);
@@ -2462,6 +2517,116 @@
     
     // Start the app
     initializeApp();
+    
+    // ============================================================
+    // RAINFALL HOVER/TAP TOOLTIP
+    // ============================================================
+    const rainfallTooltip = document.getElementById('rainfallTooltip');
+    
+    // Convert lat/lng to pixel coordinates in the radar image
+    function latLngToPixel(lat, lng) {
+      if (!currentAccumulatedMatrix) return null;
+      
+      // RADAR_BOUNDS = [[29.43, 31.9], [34.49894896665839, 37.726759765625]]
+      const minLat = RADAR_BOUNDS[0][0];
+      const minLng = RADAR_BOUNDS[0][1];
+      const maxLat = RADAR_BOUNDS[1][0];
+      const maxLng = RADAR_BOUNDS[1][1];
+      
+      // Check if point is within bounds
+      if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) {
+        return null;
+      }
+      
+      // Calculate normalized position (0-1)
+      const normX = (lng - minLng) / (maxLng - minLng);
+      const normY = 1 - (lat - minLat) / (maxLat - minLat); // Flip Y axis
+      
+      // Convert to pixel coordinates
+      const pixelX = Math.floor(normX * currentMatrixWidth);
+      const pixelY = Math.floor(normY * currentMatrixHeight);
+      
+      // Bounds check
+      if (pixelX < 0 || pixelX >= currentMatrixWidth || pixelY < 0 || pixelY >= currentMatrixHeight) {
+        return null;
+      }
+      
+      return { x: pixelX, y: pixelY };
+    }
+    
+    // Get accumulated rainfall at a specific pixel
+    function getRainfallAtPixel(x, y) {
+      if (!currentAccumulatedMatrix) return null;
+      const index = y * currentMatrixWidth + x;
+      if (index < 0 || index >= currentAccumulatedMatrix.length) return null;
+      return currentAccumulatedMatrix[index];
+    }
+    
+    // Show tooltip at screen position
+    function showRainfallTooltip(screenX, screenY, rainfall) {
+      if (rainfall === null || rainfall === undefined) {
+        rainfallTooltip.style.display = 'none';
+        return;
+      }
+      
+      if (rainfall === 0) {
+        rainfallTooltip.innerHTML = 'No rainfall';
+        rainfallTooltip.classList.add('no-data');
+      } else {
+        const formatted = rainfall < 1 ? rainfall.toFixed(2) : rainfall.toFixed(1);
+        rainfallTooltip.innerHTML = `<span class="value">${formatted}</span> mm`;
+        rainfallTooltip.classList.remove('no-data');
+      }
+      
+      rainfallTooltip.style.left = screenX + 'px';
+      rainfallTooltip.style.top = screenY + 'px';
+      rainfallTooltip.style.display = 'block';
+    }
+    
+    function hideRainfallTooltip() {
+      rainfallTooltip.style.display = 'none';
+    }
+    
+    // Handle mouse move on map (desktop)
+    map.on('mousemove', (e) => {
+      if (!currentAccumulatedMatrix) {
+        hideRainfallTooltip();
+        return;
+      }
+      
+      const pixel = latLngToPixel(e.latlng.lat, e.latlng.lng);
+      if (!pixel) {
+        hideRainfallTooltip();
+        return;
+      }
+      
+      const rainfall = getRainfallAtPixel(pixel.x, pixel.y);
+      const point = map.latLngToContainerPoint(e.latlng);
+      showRainfallTooltip(point.x, point.y, rainfall);
+    });
+    
+    // Handle mouse leave map
+    map.on('mouseout', hideRainfallTooltip);
+    
+    // Handle click/tap on map (mobile + desktop)
+    map.on('click', (e) => {
+      if (!currentAccumulatedMatrix) return;
+      
+      const pixel = latLngToPixel(e.latlng.lat, e.latlng.lng);
+      if (!pixel) {
+        hideRainfallTooltip();
+        return;
+      }
+      
+      const rainfall = getRainfallAtPixel(pixel.x, pixel.y);
+      const point = map.latLngToContainerPoint(e.latlng);
+      showRainfallTooltip(point.x, point.y, rainfall);
+      
+      // On mobile, hide tooltip after 3 seconds
+      if ('ontouchstart' in window) {
+        setTimeout(hideRainfallTooltip, 3000);
+      }
+    });
   </script>
 </body>
 </html>
