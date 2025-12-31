@@ -893,9 +893,9 @@
       <div class="panel">
         <div class="panel-title">Load Data</div>
         <div class="preset-buttons" style="margin-bottom: 0.75rem;">
-          <button class="preset-btn" data-hours="1">1h</button>
-          <button class="preset-btn" data-hours="3">3h</button>
-          <button class="preset-btn" data-hours="6">6h</button>
+            <button class="preset-btn" data-hours="1">1h</button>
+            <button class="preset-btn" data-hours="3">3h</button>
+            <button class="preset-btn" data-hours="6">6h</button>
           <button class="preset-btn" data-hours="12">12h</button>
           </div>
         <div class="preset-buttons" style="margin-bottom: 0.75rem;">
@@ -941,26 +941,26 @@
       <div class="panel">
         <div class="panel-title">Display Range</div>
         <div class="time-labels" style="margin-bottom: 0.5rem;">
-          <div class="time-label-box">
-            <div class="time-label-title">From</div>
-            <div class="time-label-value" id="fromLabel">--:--</div>
+            <div class="time-label-box">
+              <div class="time-label-title">From</div>
+              <div class="time-label-value" id="fromLabel">--:--</div>
+            </div>
+            <div class="time-label-box">
+              <div class="time-label-title">To</div>
+              <div class="time-label-value" id="toLabel">--:--</div>
+            </div>
           </div>
-          <div class="time-label-box">
-            <div class="time-label-title">To</div>
-            <div class="time-label-value" id="toLabel">--:--</div>
+          <div class="range-slider-container">
+            <div class="range-track"></div>
+            <div class="range-selected" id="rangeSelected"></div>
+            <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
+            <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
           </div>
-        </div>
-        <div class="range-slider-container">
-          <div class="range-track"></div>
-          <div class="range-selected" id="rangeSelected"></div>
-          <input type="range" class="range-input range-min" id="rangeMin" min="0" max="139" value="0">
-          <input type="range" class="range-input range-max" id="rangeMax" min="0" max="139" value="139">
-        </div>
-        <div class="playback-controls">
-          <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
-          <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
-          <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
-          <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
+          <div class="playback-controls">
+            <button class="playback-btn" id="prevHourBtn" title="Previous Hour">⏮</button>
+            <button class="playback-btn play-btn" id="playPauseBtn" title="Auto-play hours">▶</button>
+            <button class="playback-btn" id="nextHourBtn" title="Next Hour">⏭</button>
+            <span class="playback-label" id="playbackLabel">Hour-by-hour</span>
         </div>
       </div>
       
@@ -2637,34 +2637,41 @@
     const rainfallTooltip = document.getElementById('rainfallTooltip');
     
     // Convert lat/lng to pixel coordinates in the radar image
+    // Correction factor for image alignment (2 km ≈ 0.018 degrees latitude)
+    const RADAR_LAT_CORRECTION = -0.030; // Negative to shift lookup south
+    
     function latLngToPixel(lat, lng) {
       if (!currentAccumulatedMatrix) return null;
       
-      // RADAR_BOUNDS = [[29.43, 31.9], [34.49894896665839, 37.726759765625]]
-      const minLat = RADAR_BOUNDS[0][0];
-      const minLng = RADAR_BOUNDS[0][1];
-      const maxLat = RADAR_BOUNDS[1][0];
-      const maxLng = RADAR_BOUNDS[1][1];
+      // RADAR_BOUNDS = [[south, west], [north, east]]
+      const minLat = RADAR_BOUNDS[0][0]; // South
+      const minLng = RADAR_BOUNDS[0][1]; // West
+      const maxLat = RADAR_BOUNDS[1][0]; // North
+      const maxLng = RADAR_BOUNDS[1][1]; // East
+      
+      // Apply latitude correction for radar image alignment
+      const correctedLat = lat + RADAR_LAT_CORRECTION;
       
       // Check if point is within bounds
-      if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) {
+      if (correctedLat < minLat || correctedLat > maxLat || lng < minLng || lng > maxLng) {
         return null;
       }
       
       // Calculate normalized position (0-1)
       const normX = (lng - minLng) / (maxLng - minLng);
-      const normY = 1 - (lat - minLat) / (maxLat - minLat); // Flip Y axis
+      // For Y: higher lat (north) = top of image (pixel 0), lower lat (south) = bottom
+      const normY = (maxLat - correctedLat) / (maxLat - minLat);
       
-      // Convert to pixel coordinates
-      const pixelX = Math.floor(normX * currentMatrixWidth);
-      const pixelY = Math.floor(normY * currentMatrixHeight);
+      // Convert to pixel coordinates using (width-1) and (height-1) for proper mapping
+      // Use Math.round for better accuracy at pixel centers
+      const pixelX = Math.round(normX * (currentMatrixWidth - 1));
+      const pixelY = Math.round(normY * (currentMatrixHeight - 1));
       
-      // Bounds check
-      if (pixelX < 0 || pixelX >= currentMatrixWidth || pixelY < 0 || pixelY >= currentMatrixHeight) {
-        return null;
-      }
+      // Clamp to valid range
+      const clampedX = Math.min(currentMatrixWidth - 1, Math.max(0, pixelX));
+      const clampedY = Math.min(currentMatrixHeight - 1, Math.max(0, pixelY));
       
-      return { x: pixelX, y: pixelY };
+      return { x: clampedX, y: clampedY };
     }
     
     // Get accumulated rainfall at a specific pixel
