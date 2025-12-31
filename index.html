@@ -5,14 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IMS Radar Rainfall Accumulation</title>
   
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-29JFVZVS7W"></script>
+  <!-- Google Analytics - loaded by default unless user opted out -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-29JFVZVS7W');
+    // Check if user has opted out of analytics
+    function hasOptedOutAnalytics() {
+      return localStorage.getItem('analyticsOptOut') === 'true';
+    }
+    
+    // Load Google Analytics (default behavior)
+    if (!hasOptedOutAnalytics()) {
+      // Load gtag.js
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = 'https://www.googletagmanager.com/gtag/js?id=G-29JFVZVS7W';
+      document.head.appendChild(script);
+      
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+      gtag('js', new Date());
+      gtag('config', 'G-29JFVZVS7W');
+    }
   </script>
   
   <!-- Leaflet CSS -->
@@ -718,6 +731,94 @@
       border-top-color: var(--text-secondary);
     }
     
+    /* Cookie consent banner */
+    .cookie-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      z-index: 10000;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .cookie-banner.hidden {
+      display: none;
+    }
+    
+    .cookie-text {
+      flex: 1;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    
+    .cookie-text a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+    
+    .cookie-text a:hover {
+      text-decoration: underline;
+    }
+    
+    .cookie-buttons {
+      display: flex;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    
+    .cookie-btn {
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid var(--border-color);
+    }
+    
+    .cookie-btn-accept {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
+      color: var(--bg-primary);
+      border: none;
+    }
+    
+    .cookie-btn-accept:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    
+    .cookie-btn-decline {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+    
+    .cookie-btn-decline:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+    
+    @media (max-width: 768px) {
+      .cookie-banner {
+        flex-direction: column;
+        text-align: center;
+        padding: 1rem;
+      }
+      
+      .cookie-buttons {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+    
     /* Responsive */
     @media (max-width: 768px) {
       .app-container {
@@ -905,6 +1006,18 @@
   
   <!-- Rainfall tooltip (shown on hover/tap) -->
   <div id="rainfallTooltip" class="rainfall-tooltip" style="display: none;"></div>
+  
+  <!-- Cookie consent banner -->
+  <div id="cookieBanner" class="cookie-banner hidden">
+    <div class="cookie-text">
+      🍪 This site uses Google Analytics to improve your experience. 
+      Click "OK" to continue or "No Thanks" to opt out.
+    </div>
+    <div class="cookie-buttons">
+      <button id="cookieDecline" class="cookie-btn cookie-btn-decline">No Thanks</button>
+      <button id="cookieAccept" class="cookie-btn cookie-btn-accept">OK</button>
+    </div>
+  </div>
 
   <!-- Leaflet JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -2627,6 +2740,40 @@
         setTimeout(hideRainfallTooltip, 3000);
       }
     });
+    
+    // ============================================================
+    // COOKIE CONSENT BANNER
+    // ============================================================
+    const cookieBanner = document.getElementById('cookieBanner');
+    const cookieAcceptBtn = document.getElementById('cookieAccept');
+    const cookieDeclineBtn = document.getElementById('cookieDecline');
+    
+    // Show banner if user hasn't made a choice yet
+    function checkCookieConsent() {
+      const hasResponded = localStorage.getItem('cookieBannerDismissed');
+      if (!hasResponded) {
+        // No decision made yet, show banner
+        cookieBanner.classList.remove('hidden');
+      }
+    }
+    
+    // Handle accept (analytics already loaded by default)
+    cookieAcceptBtn.addEventListener('click', () => {
+      localStorage.setItem('cookieBannerDismissed', 'true');
+      localStorage.removeItem('analyticsOptOut'); // Ensure opt-out is cleared
+      cookieBanner.classList.add('hidden');
+    });
+    
+    // Handle decline - opt out and refresh
+    cookieDeclineBtn.addEventListener('click', () => {
+      localStorage.setItem('cookieBannerDismissed', 'true');
+      localStorage.setItem('analyticsOptOut', 'true');
+      // Refresh to apply the opt-out (prevents analytics from running)
+      window.location.reload();
+    });
+    
+    // Check consent on page load
+    checkCookieConsent();
   </script>
 </body>
 </html>
